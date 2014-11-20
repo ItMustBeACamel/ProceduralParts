@@ -10,6 +10,9 @@ namespace ProceduralParts
     [PartMessageDelegate]
     public delegate void ChangeTextureScaleDelegate(string name, [UseLatest] Material material, [UseLatest] Vector2 targetScale);
 
+    public delegate float CostDelegate();
+    public delegate float CostMultiplierDelegate();
+
     public class ProceduralPart : PartModule, IPartCostModifier
     {
         #region Initialization
@@ -1162,13 +1165,64 @@ namespace ProceduralParts
         [KSPField(isPersistant=true, guiActiveEditor=true, guiName="cost")]
         public float moduleCost = 0f;
 
+        [KSPField]
+        public FloatCurve CostCurve = new FloatCurve();
+
+        [KSPField]
+        public float CostCurveMin;
+        [KSPField]
+        public float CostCurveMax;
+
+        private List<CostDelegate> costDelegates = new List<CostDelegate>();
+
+        public void AddCostCallback(CostDelegate callback)
+        {
+            if (callback != null)
+                costDelegates.Add(callback);
+            else
+                throw new NullReferenceException("null delegate added to CostCallbacks");
+        }
+
+        public void RemoveCostCallback(CostDelegate callback)
+        {
+            if (callback != null)
+                costDelegates.Remove(callback);
+            else
+                Debug.LogWarning("tried to delete a null from CostCallbacks");
+        }
+
+
         public float GetModuleCost()
         {
             if (HighLogic.LoadedScene == GameScenes.EDITOR || HighLogic.LoadedScene == GameScenes.SPH)
             {
                 float cost = 0f;
                 if ((object)shape != null)
-                    cost = shape.costMultiplier * shape.Volume * costPerkL;
+                {
+                    if (shape.Volume >= CostCurve.minTime && shape.Volume <= CostCurve.maxTime)
+                    {
+                        cost = CostCurve.Evaluate(shape.Volume) * shape.costMultiplier;
+                        Debug.Log("eval" + CostCurve.Evaluate(shape.Volume));
+                        Debug.Log("shape multilpier: " + shape.costMultiplier);
+                        Debug.Log("cost: " + cost);
+                    }
+                    else
+                        cost = shape.costMultiplier * shape.Volume * costPerkL;
+                }
+
+                foreach(CostDelegate callback in costDelegates)
+                {
+                    try
+                    {
+                        cost += callback();
+                    }
+                    catch(Exception e)
+                    {
+                        Debug.LogException(e, this);
+                    }
+                }
+
+
                 if (part.Modules.Contains("TankContentSwitcher"))
                 {
                     TankContentSwitcher switcher = (TankContentSwitcher)part.Modules["TankContentSwitcher"];
@@ -1183,6 +1237,7 @@ namespace ProceduralParts
                             cost += (float)(r.maxAmount * d.unitCost);
                     }
                 }
+                
                 moduleCost = cost;
             }
             return moduleCost;

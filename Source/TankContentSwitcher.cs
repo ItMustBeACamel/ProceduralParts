@@ -41,7 +41,7 @@ namespace ProceduralParts
         {
             if (!GameSceneFilter.AnyInitializing.IsLoaded())
                 return;
-        
+            
             tankTypeOptions = new List<TankTypeOption>();
             foreach (ConfigNode optNode in node.GetNodes("TANK_TYPE_OPTION"))
             {
@@ -49,7 +49,7 @@ namespace ProceduralParts
                 option.Load(optNode);
                 tankTypeOptions.Add(option);
             }
-
+            
             // Unity for some daft reason, and not as according to it's own documentation, won't clone 
             // serializable member fields. Lets DIY.
             tankTypeOptionsSerialized = ObjectSerializer.Serialize(tankTypeOptions);
@@ -90,6 +90,15 @@ namespace ProceduralParts
             if (tankVolume != 0)
                 UpdateTankType();
             isEnabled = enabled = HighLogic.LoadedSceneIsEditor;
+
+            if(state == StartState.Editor)
+            {
+                ProceduralPart pp = GetComponent<ProceduralPart>();
+                if(null != pp)
+                {
+                    pp.AddCostCallback(GetCost);
+                }
+            }
         }
 
         public void OnUpdateEditor()
@@ -149,6 +158,36 @@ namespace ProceduralParts
             else
                 return 0; // tank type has not been initialized yet
         }
+
+        // Callback for cost generation. Gets called by the ProceduralPart object.
+        public float GetCost()
+        {
+            if (null != selectedTankType)
+            {
+                if(null != selectedTankType.costCurveNode)
+                {
+                    FloatCurve curve = new FloatCurve();
+                    curve.Load(selectedTankType.costCurveNode);
+
+                    switch(selectedTankType.costCurveType)
+                    {
+                        case TankTypeOption.CostCurveType.MASS:
+                            return curve.Evaluate(mass);
+                        case TankTypeOption.CostCurveType.VOLUME:
+                            return curve.Evaluate(tankVolume);
+                        default:
+                            return 0;
+                    }
+                }
+                else
+                {
+                    return selectedTankType.costPerkL * tankVolume + selectedTankType.costPerT * mass;
+                }
+            }
+            else
+                return 0; // tank type has not been initialized yet
+        }
+
         private List<TankTypeOption> tankTypeOptions;
 
         // This should be private, but there's a bug in KSP.
@@ -158,6 +197,12 @@ namespace ProceduralParts
         [Serializable]
         public class TankTypeOption : IConfigNode
         {
+            public enum CostCurveType // to define the independent axis of the cost curve
+            {
+                VOLUME,
+                MASS,
+            }
+
             [Persistent]
             public string name;
             [Persistent]
@@ -168,7 +213,20 @@ namespace ProceduralParts
             public bool isStructural = false;
             [Persistent]
             public float costMultiplier = 1.0f;
+            [Persistent]
+            public float costPerT = 0.0f;
+            [Persistent]
+            public float costPerkL = 0.0f;
+            [Persistent]
+            public CostCurveType costCurveType = CostCurveType.VOLUME;
+    
+            //[NonSerialized] // this is marked as Serializable, but throws an exception when I try to Serialize it...ouch!
+            //public FloatCurve dryDensityCurve = new FloatCurve();
+
+            public ConfigNode densityNode;
+            public ConfigNode costCurveNode;
             
+           
             public List<TankResource> resources;
 
             public void Load(ConfigNode node)
@@ -182,6 +240,10 @@ namespace ProceduralParts
                     resources.Add(resource);
                 }
                 resources.Sort();
+
+                densityNode = node.GetNode("DRY_MASS");
+                costCurveNode = node.GetNode("COST");
+
             }
             public void Save(ConfigNode node)
             {
@@ -192,12 +254,29 @@ namespace ProceduralParts
                     resource.Save(resNode);
                     node.AddNode(resNode);
                 }
+
+                if(null != densityNode)
+                    node.AddNode(densityNode);
+                if (null != costCurveNode)
+                    node.AddNode(costCurveNode);
+
+
             }
         }
+
 
         [Serializable]
         public class TankResource : IConfigNode, IComparable<TankResource>
         {
+            public enum ResourceCurveType
+            {
+                VOLUME_UNITS,
+                MASS_UNITS,
+                VOLUME_UNITS_PER_VOLUME,
+                MASS_UNITS_PER_TON
+            }
+
+            
             [Persistent]
             public string name;
             [Persistent]
@@ -211,19 +290,65 @@ namespace ProceduralParts
             [Persistent]
             public bool forceEmpty = false;
 
+            [Persistent]
+            public ConfigNode unitsCurveNode;
+
+            [Persistent]
+            public ResourceCurveType curveType = ResourceCurveType.VOLUME_UNITS;
+
             public void Load(ConfigNode node)
             {
                 ConfigNode.LoadObjectFromConfig(this, node);
+                unitsCurveNode = node.GetNode("UNITS");
             }
             public void Save(ConfigNode node)
             {
                 ConfigNode.CreateConfigFromObject(this, node);
+                node.AddNode(unitsCurveNode);
             }
 
             int IComparable<TankResource>.CompareTo(TankResource other)
             {
                 return other == null ? 1 : 
                     string.Compare(name, other.name, StringComparison.Ordinal);
+            }
+
+            public double GetMaxAmount(float volume, float mass)
+            {
+                if(null != unitsCurveNode)
+                {
+                    FloatCurve amountCurve = new FloatCurve();
+                    amountCurve.Load(unitsCurveNode);
+                    
+                    switch(curveType)
+                    {
+                        case ResourceCurveType.MASS_UNITS:
+                            if (mass >= amountCurve.minTime && mass <= amountCurve.maxTime)
+                                return Math.Round(amountCurve.Evaluate(mass), 2);
+                            else
+                                break;
+                            
+                        case ResourceCurveType.VOLUME_UNITS:
+                            if (volume >= amountCurve.minTime && volume <= amountCurve.maxTime)
+                                return Math.Round(amountCurve.Evaluate(volume), 2);
+                            else
+                                break;
+
+                        case ResourceCurveType.MASS_UNITS_PER_TON:
+                            if (mass >= amountCurve.minTime && mass <= amountCurve.maxTime)
+                                return Math.Round(amountCurve.Evaluate(mass) * mass, 2);
+                            else
+                                break;
+                        
+                        case ResourceCurveType.VOLUME_UNITS_PER_VOLUME:
+                            if (volume >= amountCurve.minTime && volume <= amountCurve.maxTime)
+                                return Math.Round(amountCurve.Evaluate(volume) * volume, 2);
+                            else
+                                break;
+                    }
+                }
+                
+                return Math.Round(unitsConst + volume * unitsPerKL + mass * unitsPerT, 2);
             }
         }
 
@@ -312,7 +437,25 @@ namespace ProceduralParts
 
             if (tankVolumeName != null)
             {
-                part.mass = mass = selectedTankType.dryDensity * tankVolume + selectedTankType.massConstant;
+                if (null != selectedTankType.densityNode)
+                {
+                    FloatCurve dryDensityCurve = new FloatCurve();
+                    dryDensityCurve.Load(selectedTankType.densityNode);
+
+                    Debug.Log("density curve != null");
+                    if (tankVolume >= dryDensityCurve.minTime &&
+                    tankVolume <= dryDensityCurve.maxTime)
+                    {
+                        Debug.Log("inside curve bounds");
+                        part.mass = mass = dryDensityCurve.Evaluate(tankVolume);
+                    }
+                    else
+                        part.mass = mass = selectedTankType.dryDensity * tankVolume + selectedTankType.massConstant;
+
+                }
+                else
+                    part.mass = mass = selectedTankType.dryDensity * tankVolume + selectedTankType.massConstant;
+                
                 MassChanged(mass);
             }
 
@@ -348,7 +491,7 @@ namespace ProceduralParts
                 InitialAmountChanged(resource, resource.amount);
             }
         }
-
+        
         private bool UpdateResources()
         {
             // Hopefully we can just fiddle with the existing part resources.
@@ -370,7 +513,7 @@ namespace ProceduralParts
                     return false;
                 }
 
-                double maxAmount = (float)Math.Round(tankRes.unitsConst + tankVolume * tankRes.unitsPerKL + mass * tankRes.unitsPerT, 2);
+                double maxAmount = tankRes.GetMaxAmount(tankVolume, mass); //(float)Math.Round(tankRes.unitsConst + tankVolume * tankRes.unitsPerKL + mass * tankRes.unitsPerT, 2);
 
                 // ReSharper disable CompareOfFloatsByEqualityOperator
                 if (partRes.maxAmount == maxAmount)
@@ -407,7 +550,7 @@ namespace ProceduralParts
             // the sliders that affect part contents properly cos they get recreated underneith you and the drag dies.
             foreach (TankResource res in selectedTankType.resources)
             {
-                double maxAmount = Math.Round(res.unitsConst + tankVolume * res.unitsPerKL + part.mass * res.unitsPerT, 2);
+                double maxAmount = res.GetMaxAmount(tankVolume, part.mass); //Math.Round(res.unitsConst + tankVolume * res.unitsPerKL + part.mass * res.unitsPerT, 2);
 
                 ConfigNode node = new ConfigNode("RESOURCE");
                 node.AddValue("name", res.name);
