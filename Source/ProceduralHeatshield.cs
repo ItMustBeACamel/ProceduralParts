@@ -329,6 +329,8 @@ namespace ProceduralParts
 
                     int vertCount = topInner.Length;
 
+                    
+
                     //foreach (Vector3 v in topInner)
                     //    Debug.Log(v);
 
@@ -351,7 +353,7 @@ namespace ProceduralParts
                     Vector3[] bottomInner = (Vector3[])topInner.Clone();
                     Vector3[] bottomOuter = (Vector3[])topOuter.Clone();
 
-
+                    
 
                     for (int i = 0; i < vertCount; ++i)
                     {
@@ -367,6 +369,35 @@ namespace ProceduralParts
 
                     Vector3[] innerSideTop = (Vector3[])topInner.Clone();
                     Vector3[] innerSideBottom = (Vector3[])bottomInner.Clone();
+
+                    Vector2[] topUV = new Vector2[vertCount];
+                    Vector2[] bottomUV = new Vector2[vertCount];
+                    //Vector2[] bottomOuterUV = new Vector2[vertCount];
+                    //Vector2[] bottomInnerUV = new Vector2[vertCount];
+
+                    for (int i = 0; i < vertCount; ++i)
+                    {
+
+                        bottomUV[i] = new Vector2(Mathf.InverseLerp(0, vertCount - 1, i), 0.0f);
+                        topUV[i] = new Vector2(Mathf.InverseLerp(0, vertCount - 1, i), 1.0f);
+
+                        //bottomOuterUV[i] = new Vector2(Mathf.InverseLerp(0, vertCount - 1, i), 0.0f);
+                        //bottomInnerUV[i] = new Vector2(Mathf.InverseLerp(0, vertCount - 1, i), 0.0f);
+                    }
+
+                    RingMeshBuilder ringMeshBuilder = new RingMeshBuilder(false);
+
+                    ringMeshBuilder.AddRing(topInner, topUV, null, RingMeshBuilder.EdgeMode.Sharp);
+                    ringMeshBuilder.AddRing(topOuter, bottomUV, topUV, RingMeshBuilder.EdgeMode.SharpSeam);
+
+                    ringMeshBuilder.AddRing(bottomOuter, bottomUV, bottomUV, RingMeshBuilder.EdgeMode.SharpSeam);
+                    ringMeshBuilder.AddRing(bottomInner, topUV, bottomUV, RingMeshBuilder.EdgeMode.SharpSeam);
+
+                    ringMeshBuilder.AddRing(topInner, topUV, null, RingMeshBuilder.EdgeMode.Sharp);
+
+                    UncheckedMesh m = ringMeshBuilder.BuildMesh(false);
+
+                    /*
 
                     int topInnerStart = 0;
                     int topOuterStart = topInnerStart + vertCount;
@@ -436,10 +467,11 @@ namespace ProceduralParts
                     triangleOffset = ConnectRings(m, bottomOuterStart, bottomInnerStart, vertCount, triangleOffset);
                     triangleOffset = ConnectRings(m, innerSideBottomStart, innerSideTopStart, vertCount, triangleOffset);
 
+                     */
                     if (fairingMesh != null)
                     {
                         m.WriteTo(fairingMesh);
-                        fairingMesh.RecalculateNormals();
+                        //fairingMesh.RecalculateNormals();
 
                     }
                     else

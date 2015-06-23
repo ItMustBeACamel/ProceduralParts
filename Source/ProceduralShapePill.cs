@@ -32,7 +32,7 @@ namespace ProceduralParts
         {
             UpdateTechConstraints();
         }
-
+        
         // A few shortcuts to use in formulas.
         private const float Pi = Mathf.PI;
         private static readonly Func<float, float> sqrt = Mathf.Sqrt;

@@ -212,7 +212,11 @@ namespace ProceduralParts
             {
                 OFFSET_FROM_SHAPE_CENTER,
                 OFFSET_FROM_SHAPE_RADIUS,
-                RELATIVE_TO_SHAPE_RADIUS
+                RELATIVE_TO_SHAPE_RADIUS,
+                RELATIVE_TO_TOP_RADIUS,
+                RELATIVE_TO_BOTTOM_RADIUS,
+                OFFSET_FROM_TOP_RADIUS,
+                OFFSET_FROM_BOTTOM_RADIUS
             }
 
             public enum YMode

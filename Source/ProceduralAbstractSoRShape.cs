@@ -22,6 +22,7 @@ namespace ProceduralParts
 
         #endregion
 
+
         #region attachments
 
         public override Vector3 FromCylindricCoordinates(ShapeCoordinates coords)
@@ -52,17 +53,79 @@ namespace ProceduralParts
                     break;
             }
 
+            float radius = 0;
 
-            float radius = coords.r;
+            switch(coords.RadiusMode)
+            {
+                case ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_CENTER:
+                    radius = coords.r;
+                    break;
+
+                case ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS:
+                    radius = lastProfile.Last.Value.dia / 2.0f * coords.r;
+                    break;
+
+                case ShapeCoordinates.RMode.RELATIVE_TO_BOTTOM_RADIUS:
+                    radius = lastProfile.First.Value.dia / 2.0f * coords.r;
+                    break;
+
+                case ShapeCoordinates.RMode.OFFSET_FROM_TOP_RADIUS:
+                    radius = lastProfile.Last.Value.dia / 2.0f + coords.r;
+                    break;
+
+                case ShapeCoordinates.RMode.OFFSET_FROM_BOTTOM_RADIUS:
+                    radius = lastProfile.First.Value.dia / 2.0f + coords.r;
+                    break;
+
+                case ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS:
+                case ShapeCoordinates.RMode.RELATIVE_TO_SHAPE_RADIUS:
+
+                    if (position.y <= lastProfile.First.Value.y)
+                        if (coords.RadiusMode == ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS)
+                            goto case ShapeCoordinates.RMode.OFFSET_FROM_BOTTOM_RADIUS;
+                        else
+                            goto case ShapeCoordinates.RMode.RELATIVE_TO_BOTTOM_RADIUS;
+
+                    if (position.y >= lastProfile.Last.Value.y)
+                        if (coords.RadiusMode == ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS)
+                            goto case ShapeCoordinates.RMode.OFFSET_FROM_TOP_RADIUS;
+                        else
+                            goto case ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS;
+
+                    ProfilePoint pt = lastProfile.First.Value;
+                    for (LinkedListNode<ProfilePoint> ptNode = lastProfile.First.Next; ptNode != null; ptNode = ptNode.Next)
+                    {
+                        if (!ptNode.Value.inCollider)
+                            continue;
+                        ProfilePoint pv = pt;
+                        pt = ptNode.Value;
+
+                        if (position.y >= Mathf.Min(pv.y, pt.y) && position.y < Mathf.Max(pv.y, pt.y))
+                        {
+                            float t = Mathf.InverseLerp(Mathf.Min(pv.y, pt.y), Mathf.Max(pv.y, pt.y), position.y);
+                            float profileRadius = Mathf.Lerp(pv.dia, pt.dia, t) / 2.0f;
+
+                            
+                            radius = coords.RadiusMode == ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS ? 
+                                profileRadius + coords.r :
+                                radius = profileRadius * coords.r;
+                        }
+                    }
+
+                    break;
+            }
+
+            /*
+            radius = coords.r;
 
             if (coords.RadiusMode != ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_CENTER)
             {
-                if (position.y < lastProfile.First.Value.y)
+                if (position.y <= lastProfile.First.Value.y)
                     radius = coords.RadiusMode == ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS ?
                         lastProfile.First.Value.dia / 2.0f + coords.r :
                         radius = lastProfile.First.Value.dia / 2.0f * coords.r;
 
-                else if (position.y > lastProfile.Last.Value.y)
+                else if (position.y >= lastProfile.Last.Value.y)
                     radius = coords.RadiusMode == ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS ?
                         lastProfile.Last.Value.dia / 2.0f + coords.r :
                         radius = lastProfile.Last.Value.dia / 2.0f * coords.r;
@@ -90,7 +153,7 @@ namespace ProceduralParts
                 }
             }
 
-            
+            */
             float theta = Mathf.Lerp(0, Mathf.PI * 2f, coords.u);
 
             position.x = Mathf.Cos(theta) * radius;
@@ -705,14 +768,64 @@ namespace ProceduralParts
 
 
             // The endcaps.
+            /*
             nVrt = first.circ.totVertexes + last.circ.totVertexes;
             nTri = first.circ.totVertexes - 2 + last.circ.totVertexes - 2;
             m = new UncheckedMesh(nVrt, nTri);
 
             first.circ.WriteEndcap(first.dia, first.y, false, 0, 0, m, false);
             last.circ.WriteEndcap(last.dia, last.y, true, first.circ.totVertexes, (first.circ.totVertexes - 2) * 3, m, !odd);
+            */
 
+            EndCapProfile testProfile = new EndCapProfile();
+
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.5f, 0.0f, 0.5f, 0.5f));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.7f, 0.1f, 0.7f, 0.7f));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.0f, 0.0f, 1.0f, 1.0f));
+
+            // Stockalike cap
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.65f, 0.95f, 0.6f, EndCapProfile.EdgeMode.Sharp ));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.65f, 1.2f, 0.65f, EndCapProfile.EdgeMode.Sharp ));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.03f, 1.2f, 0.95f, EndCapProfile.EdgeMode.Sharp ));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.03f, 0.97f, 1.0f, EndCapProfile.EdgeMode.Sharp ));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.0f, 0.97f, 1.0f  , EndCapProfile.EdgeMode.Sharp, rmode: EndCapProfile.RMode.RELATIVE_TO_SHAPE_RADIUS));
+
+            // tank dome
+            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.172f, 0.875f, 0.2f));
+            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.344f, 0.831f, 0.3f));
+            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.950f, 0.636f, 0.6f, EndCapProfile.EdgeMode.Sharp));
+            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.950f, 1.000f, 0.7f, EndCapProfile.EdgeMode.Sharp));
+            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.000f, 1.000f, 1.000f, EndCapProfile.EdgeMode.Sharp));
             
+            if (endCaps != null)
+            {
+                if (endCaps.EndCapProfiles != null)
+                {
+                    Debug.Log(endCaps.blubb);
+                    //part.partInfo.iconPrefab.
+                    foreach (EndCapProfile p in endCaps.EndCapProfiles)
+                    {
+                        Debug.LogWarning("end cap " + p.name);
+                        foreach (EndCapProfile.EndCapProfilePoint pp in p.ProfilePoints)
+                        {
+                            Debug.Log("profile point: " + pp);
+                        }
+                    }
+                }
+                else
+                    Debug.LogError("end caps profiles == null");
+            }
+            else
+                Debug.Log("endCaps == null");
+           
+
+            Debug.Log("top");
+            UncheckedMesh top = CreateEndCapFromProfile(true, pts, testProfile);
+            Debug.Log("bottom");
+            UncheckedMesh bottom = CreateEndCapFromProfile(false, pts, testProfile);
+
+            m = top.Combine(bottom);
+
 
             if (HighLogic.LoadedScene == GameScenes.LOADING)
                 m.WriteTo(PPart.EndsIconMesh);
@@ -859,6 +972,101 @@ namespace ProceduralParts
 
             // TODO: separate out the meshes for each end so we can use the scale for texturing.
             RaiseChangeTextureScale(nodeName, PPart.EndsMaterial, new Vector2(pt.dia, pt.dia));
+        }
+
+        [KSPField]
+        public EndCapProfileList endCaps = new EndCapProfileList();
+        
+        [KSPField(isPersistant=true)]
+        public string endCap;
+
+        protected UncheckedMesh CreateEndCapFromProfile(bool top, LinkedList<ProfilePoint> pts, EndCapProfile profile)
+        {
+            ProfilePoint profilePoint = top ? pts.Last.Value : pts.First.Value;
+
+            Vector3[] vertices = new Vector3[profilePoint.circ.totVertexes];
+
+            bool odd = false;
+
+
+            odd = top ? pts.Count % 2 == 0 : false;
+
+            profilePoint.circ.WriteEndcapVerticies(profilePoint.dia, profilePoint.y, 0, vertices, odd);
+
+            int vertCount = vertices.Length;
+
+            RingMeshBuilder meshBuilder = new RingMeshBuilder(true);
+
+            Vector3[] positions = new Vector3[vertCount];
+            Vector2[] uv1 = new Vector2[vertCount];
+            Vector2[] uv2 = new Vector2[vertCount];
+
+            foreach(EndCapProfile.EndCapProfilePoint pp in profile.ProfilePoints)
+            {
+                for (int i = 0; i < vertCount; i++)
+                {
+                    ShapeCoordinates coords = new ShapeCoordinates();
+                    coords.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+
+                    switch(pp.RadiusMode)
+                    {
+                        case EndCapProfile.RMode.RELATIVE_TO_CAP_RADIUS:
+                            coords.RadiusMode = top ? ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS : ShapeCoordinates.RMode.RELATIVE_TO_BOTTOM_RADIUS;
+                            break;
+
+                        case EndCapProfile.RMode.RELATIVE_TO_SHAPE_RADIUS:
+                            coords.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_SHAPE_RADIUS;
+                            break;
+                    }
+                    
+
+                    float theta = Mathf.Atan2(-vertices[i].z, vertices[i].x);
+
+                    coords.u = (Mathf.InverseLerp(-Mathf.PI, Mathf.PI, theta) + 0.5f) % 1.0f;
+
+                    //Debug.LogWarning("Last Profile: " + lastProfile.Last.Value.y);
+                    //Debug.LogWarning("pts: " + pts.Last.Value.y);
+
+                    //GetCylindricCoordinates(vertices[i], coords);
+                    //Debug.LogWarning("r: " + coords.r);
+                    coords.r = pp.r;
+                    coords.y = top ? pp.yoffset : -pp.yoffset;
+                    positions[i] = FromCylindricCoordinates(coords);
+
+                    //positions[i] = vertices[i].xz() * pp.r;
+                    //positions[i].y = top ? vertices[i].y + pp.offset : vertices[i].y - pp.offset;
+
+                    uv1[i] = vertices[i].xz2().normalized / 2.0f * pp.uv1 + new Vector2(0.5f, 0.5f);
+                    uv2[i] = vertices[i].xz2().normalized / 2.0f * pp.uv2 + new Vector2(0.5f, 0.5f);
+                    
+                }
+
+                RingMeshBuilder.EdgeMode edgeMode;
+                switch(pp.EdgeMode)
+                {
+                    case EndCapProfile.EdgeMode.Sharp:
+                        edgeMode = RingMeshBuilder.EdgeMode.Sharp;
+                        break;
+                    case EndCapProfile.EdgeMode.SharpSeam:
+                        edgeMode = RingMeshBuilder.EdgeMode.SharpSeam;
+                        break;
+                    case EndCapProfile.EdgeMode.Smooth:
+                        edgeMode = RingMeshBuilder.EdgeMode.Smooth;
+                        break;
+                    case EndCapProfile.EdgeMode.SmoothSeam:
+                        edgeMode = RingMeshBuilder.EdgeMode.SmoothSeam;
+                        break;
+                    default:
+                        edgeMode = RingMeshBuilder.EdgeMode.Smooth;
+                        break;
+                }
+
+                meshBuilder.AddRing(positions, uv1, uv2, edgeMode);
+            }
+
+            UncheckedMesh m = meshBuilder.BuildMesh(!top, true);
+
+            return m;
         }
 
         #endregion
