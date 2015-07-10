@@ -28,9 +28,23 @@ namespace ProceduralParts
         [KSPField]
         public string volumeName = PartVolumes.Tankage.ToString();
 
+
+        #endregion
+
+        #region balancing
+        // this are additional info fields that can be used by other modules for balancing purposes. shape classes should not use them themself
+
         [KSPField]
         public float costMultiplier = 1.0f;
 
+        [KSPField]
+        public float massMultiplier = 1.0f;
+
+        [KSPField]
+        public float resourceMultiplier = 1.0f;
+        
+        /////////////////////////////////////
+        
         #endregion
 
         #region Objects
@@ -233,6 +247,11 @@ namespace ProceduralParts
             public float u;
             public float y;
             public float r;
+
+            public override string ToString()
+            {
+                return "(u: " + u + " y: " + y + " r: " + r + ") R: " +RadiusMode + "Y: " + HeightMode;
+            }
         }
 
         public abstract void GetCylindricCoordinates(Vector3 position, ShapeCoordinates coords);
