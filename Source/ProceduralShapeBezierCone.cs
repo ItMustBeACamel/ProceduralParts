@@ -47,6 +47,7 @@ namespace ProceduralParts
 
         public override void OnStart(StartState state)
         {
+            base.OnStart(state);
             if (!HighLogic.LoadedSceneIsEditor)
                 return;
 

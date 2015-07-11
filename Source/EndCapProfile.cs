@@ -20,8 +20,8 @@ namespace ProceduralParts
             Debug.LogWarning("ProfileList Load");
             ConfigNode[] nodes = node.GetNodes("END_CAP");
 
-            if (!float.TryParse(node.GetValue("blubb"), out blubb))
-                Debug.LogError("could not parse blubb");
+            //if (!float.TryParse(node.GetValue("blubb"), out blubb))
+            //    Debug.LogError("could not parse blubb");
 
             foreach(ConfigNode n in nodes)
             {
@@ -37,12 +37,12 @@ namespace ProceduralParts
         public void Save(ConfigNode node)
         {
             Debug.LogWarning("ProfileList Save");
-            node.AddValue("blubb", blubb);
+            //node.AddValue("blubb", blubb);
             foreach(EndCapProfile p in EndCapProfiles)
             {
                 ConfigNode n = ConfigNode.CreateConfigFromObject(p);
                 p.Save(n);
-                node.AddNode(n);
+                node.AddNode("END_CAP",n);
             }          
         }
     }
@@ -53,25 +53,48 @@ namespace ProceduralParts
         [Persistent]
         public string name = "*";
 
+        [Persistent]
+        public string texture;
+
+        [Persistent]
+        public string bump;
+
+        [Persistent]
+        public float shininess = 0.4f;
+        
+        [NonSerialized]
+        public Color specular = new Color(0.2f, 0.2f, 0.2f);
+
+        [Persistent]
+        public bool closeFirstRing = true;
+
+        [Persistent]
+        public bool createTop = true;
+
+        [Persistent]
+        public bool createBottom = true;
+
         public enum EdgeMode
         {
-            Smooth,
-            Sharp,
-            SmoothSeam,
-            SharpSeam
+            SMOOTH,
+            SHARP,
+            SMOOTH_SEAM,
+            SHARP_SEAM
         }
 
         public enum YMode
         {
-            OffsetFromCenter,
-            Offset,
-            Relative
+            OFFSET_FROM_CENTER,
+            OFFSET,
+            RELATIVE
         }
 
         public enum RMode
         {
             RELATIVE_TO_CAP_RADIUS,
-            RELATIVE_TO_SHAPE_RADIUS
+            RELATIVE_TO_SHAPE_RADIUS,
+            OFFSET_TO_CAP_RADIUS,
+            OFFSET_TO_SHAPE_RADIUS
         }
 
         [Serializable]
@@ -83,11 +106,13 @@ namespace ProceduralParts
             public float uv2;
             public EdgeMode EdgeMode;
             public RMode RadiusMode;
+            public YMode HeightMode;
 
             public EndCapProfilePoint(float r, float y, float uv1,
-                EdgeMode edgeMode = EndCapProfile.EdgeMode.Smooth,
+                EdgeMode edgeMode = EndCapProfile.EdgeMode.SMOOTH,
                 float uv2=0.0f,
-                RMode rmode = RMode.RELATIVE_TO_CAP_RADIUS)
+                RMode rmode = RMode.RELATIVE_TO_CAP_RADIUS,
+                YMode ymode = YMode.RELATIVE)
             {
                 this.r = r;
                 this.yoffset = y;
@@ -95,6 +120,7 @@ namespace ProceduralParts
                 this.uv2 = uv2;
                 this.EdgeMode = edgeMode;
                 this.RadiusMode = rmode;
+                this.HeightMode = ymode;
             }
 
             public EndCapProfilePoint(string s)
@@ -109,7 +135,7 @@ namespace ProceduralParts
                 if (elements.Length > 3)
                     EdgeMode = (EdgeMode) Enum.Parse(typeof(EdgeMode), elements[3]);
                 else
-                    EdgeMode = EndCapProfile.EdgeMode.Smooth;
+                    EdgeMode = EndCapProfile.EdgeMode.SMOOTH;
 
 
                 if (elements.Length > 4)
@@ -122,6 +148,11 @@ namespace ProceduralParts
                 else
                     RadiusMode = EndCapProfile.RMode.RELATIVE_TO_CAP_RADIUS;
 
+                if (elements.Length > 6)
+                    HeightMode = (YMode)Enum.Parse(typeof(YMode), elements[6]);
+                else
+                    HeightMode = YMode.RELATIVE;
+
                 //EdgeMode = EndCapProfile.EdgeMode.Smooth;
                 //RadiusMode = RMode.RELATIVE_TO_CAP_RADIUS;
             }
@@ -129,7 +160,7 @@ namespace ProceduralParts
             public override string ToString()
             {
                 string s;
-                s = r + " " + yoffset + " " + uv1 + " " + EdgeMode + " " + uv2 + " " + RadiusMode;
+                s = r + " " + yoffset + " " + uv1 + " " + EdgeMode + " " + uv2 + " " + RadiusMode + " " + HeightMode;
                 return s;
             }
         }
@@ -137,6 +168,7 @@ namespace ProceduralParts
         //[NonSerialized]
         public List<EndCapProfilePoint> ProfilePoints = new List<EndCapProfilePoint>();
 
+        
         
 
         public void Load(ConfigNode node)
@@ -149,6 +181,9 @@ namespace ProceduralParts
                 ProfilePoints.Add(newPoint);
                 Debug.LogWarning("Loaded key: " + newPoint);
             }
+
+            if(node.HasNode("specular"))
+              specular = ConfigNode.ParseColor(node.GetNode("sides").GetValue("specular"));
         }
 
         public void Save(ConfigNode node)

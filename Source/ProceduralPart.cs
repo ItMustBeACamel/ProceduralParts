@@ -667,7 +667,7 @@ namespace ProceduralParts
                 float.TryParse(node.GetNode("sides").GetValue("shininess"), out tex.sidesShininess);
 
             Texture[] textures = Resources.FindObjectsOfTypeAll(typeof(Texture)) as Texture[];
-
+            
             if (!TryFindTexture(textures, ref tex.sidesName, out tex.sides))
             {
                 Debug.LogError("*ST* Sides textures not found for " + textureSet);
@@ -742,7 +742,7 @@ namespace ProceduralParts
         {
             if (textureSet == oldTextureSet)
                 return;
-
+            //Debug.Log("update texture");
             Material EndsMaterial;
             Material SidesMaterial;
 
@@ -775,8 +775,9 @@ namespace ProceduralParts
                 SidesMaterial.shader = Shader.Find(tex.sidesBump != null ? "KSP/Bumped Specular" : "KSP/Specular");
 
                 // pt is no longer specular ever, just diffuse.
-                if (EndsMaterial != null)
-                    EndsMaterial.shader = Shader.Find("KSP/Diffuse");
+                // update: end caps now controlled by shapes
+                //if (EndsMaterial != null)
+                //    EndsMaterial.shader = Shader.Find("KSP/Diffuse");
             }
 
             SidesMaterial.SetColor("_SpecColor", tex.sidesSpecular);
@@ -824,8 +825,8 @@ namespace ProceduralParts
                 SidesMaterial.SetTextureOffset("_BumpMap", Vector2.zero);
                 SidesMaterial.SetTexture("_BumpMap", tex.sidesBump);
             }
-            if (EndsMaterial != null)
-                EndsMaterial.SetTexture("_MainTex", tex.ends);
+            //if (EndsMaterial != null)
+            //    EndsMaterial.SetTexture("_MainTex", tex.ends);
         }
 
         #endregion

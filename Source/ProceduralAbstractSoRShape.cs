@@ -8,6 +8,75 @@ namespace ProceduralParts
 {
     public abstract class ProceduralAbstractSoRShape : ProceduralAbstractShape
     {
+
+        #region Callbacks
+
+        public override void OnLoad(ConfigNode node)
+        {
+            base.OnLoad(node);
+            Debug.LogWarning("OnLoad Shape");
+            endCaps = new EndCapProfileList();
+
+            ConfigNode endCapsNode = node.GetNode("END_CAPS");
+
+            if(endCapsNode != null)
+            {
+                endCaps.Load(endCapsNode);
+            }
+            else
+            {
+                Debug.LogWarning("No End caps found");
+            }
+
+            // Serialize the end caps
+            endCapsSerialized = ObjectSerializer.Serialize(endCaps);
+        }
+
+        public override void OnSave(ConfigNode node)
+        {
+            base.OnSave(node);
+
+            if (endCaps != null)
+            {
+                ConfigNode capsNode = ConfigNode.CreateConfigFromObject(endCaps);
+                endCaps.Save(capsNode);
+
+                node.AddNode("END_CAPS", capsNode);
+            }
+
+        }
+
+        public override void OnStart(StartState state)
+        {
+            Debug.LogWarning("OnStart Shape " + part.ClassName);
+            
+            base.OnStart(state);
+            
+            if (endCapsSerialized != null)
+            {
+                ObjectSerializer.Deserialize(endCapsSerialized, out endCaps);
+
+                BaseField field = Fields["endCap"];
+                UI_ChooseOption range = (UI_ChooseOption)field.uiControlEditor;
+
+                range.options = endCaps.EndCapProfiles.Select(x => x.name).ToArray();
+            }
+            else
+                Debug.LogWarning("endCapSerialized == null");
+
+            UpdateEndCaps(true);
+
+        }
+
+        public override void OnUpdateEditor()
+        {
+            base.OnUpdateEditor();
+
+            UpdateEndCaps();
+        }
+
+        #endregion
+
         #region Config fields
 
         internal const int MinCircleVertexes = 12;
@@ -777,7 +846,7 @@ namespace ProceduralParts
             last.circ.WriteEndcap(last.dia, last.y, true, first.circ.totVertexes, (first.circ.totVertexes - 2) * 3, m, !odd);
             */
 
-            EndCapProfile testProfile = new EndCapProfile();
+            //EndCapProfile testProfile = new EndCapProfile();
 
             //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.5f, 0.0f, 0.5f, 0.5f));
             //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.7f, 0.1f, 0.7f, 0.7f));
@@ -791,40 +860,68 @@ namespace ProceduralParts
             //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.0f, 0.97f, 1.0f  , EndCapProfile.EdgeMode.Sharp, rmode: EndCapProfile.RMode.RELATIVE_TO_SHAPE_RADIUS));
 
             // tank dome
-            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.172f, 0.875f, 0.2f));
-            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.344f, 0.831f, 0.3f));
-            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.950f, 0.636f, 0.6f, EndCapProfile.EdgeMode.Sharp));
-            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.950f, 1.000f, 0.7f, EndCapProfile.EdgeMode.Sharp));
-            testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.000f, 1.000f, 1.000f, EndCapProfile.EdgeMode.Sharp));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.172f, 0.875f, 0.2f));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.344f, 0.831f, 0.3f));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.950f, 0.636f, 0.6f, EndCapProfile.EdgeMode.Sharp));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.950f, 1.000f, 0.7f, EndCapProfile.EdgeMode.Sharp));
+            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.000f, 1.000f, 1.000f, EndCapProfile.EdgeMode.Sharp));
             
-            if (endCaps != null)
+            //if (endCaps != null)
+            //{
+            //    if (endCaps.EndCapProfiles != null)
+            //    {
+            //        Debug.Log(endCaps.blubb);
+            //        //part.partInfo.iconPrefab.
+            //        foreach (EndCapProfile p in endCaps.EndCapProfiles)
+            //        {
+            //            Debug.LogWarning("end cap " + p.name);
+            //            foreach (EndCapProfile.EndCapProfilePoint pp in p.ProfilePoints)
+            //            {
+            //                Debug.Log("profile point: " + pp);
+            //            }
+            //        }
+            //    }
+            //    else
+            //        Debug.LogError("end caps profiles == null");
+            //}
+            //else
+            //    Debug.Log("endCaps == null");
+
+            if (selectedEndCap != null && selectedEndCap.ProfilePoints.Count >= 2)
             {
-                if (endCaps.EndCapProfiles != null)
-                {
-                    Debug.Log(endCaps.blubb);
-                    //part.partInfo.iconPrefab.
-                    foreach (EndCapProfile p in endCaps.EndCapProfiles)
-                    {
-                        Debug.LogWarning("end cap " + p.name);
-                        foreach (EndCapProfile.EndCapProfilePoint pp in p.ProfilePoints)
-                        {
-                            Debug.Log("profile point: " + pp);
-                        }
-                    }
-                }
+
+                UncheckedMesh top = null;
+                UncheckedMesh bottom = null;
+                
+                if(selectedEndCap.createTop)
+                    top = CreateEndCapFromProfile(true, pts, selectedEndCap);
+               
+               
+                if(selectedEndCap.createBottom)
+                    bottom = CreateEndCapFromProfile(false, pts, selectedEndCap);
+
+                if(top != null && bottom != null)
+                    m = top.Combine(bottom);
                 else
-                    Debug.LogError("end caps profiles == null");
+                {
+                    if (top != null)
+                        m = top;
+                    if (bottom != null)
+                        m = bottom;
+                }
+
             }
             else
-                Debug.Log("endCaps == null");
-           
+            {
+                // Write default endcaps.         
+                nVrt = first.circ.totVertexes + last.circ.totVertexes;
+                nTri = first.circ.totVertexes - 2 + last.circ.totVertexes - 2;
+                m = new UncheckedMesh(nVrt, nTri);
 
-            Debug.Log("top");
-            UncheckedMesh top = CreateEndCapFromProfile(true, pts, testProfile);
-            Debug.Log("bottom");
-            UncheckedMesh bottom = CreateEndCapFromProfile(false, pts, testProfile);
+                first.circ.WriteEndcap(first.dia, first.y, false, 0, 0, m, false);
+                last.circ.WriteEndcap(last.dia, last.y, true, first.circ.totVertexes, (first.circ.totVertexes - 2) * 3, m, !odd);
+            }
 
-            m = top.Combine(bottom);
 
 
             if (HighLogic.LoadedScene == GameScenes.LOADING)
@@ -974,11 +1071,7 @@ namespace ProceduralParts
             RaiseChangeTextureScale(nodeName, PPart.EndsMaterial, new Vector2(pt.dia, pt.dia));
         }
 
-        [KSPField]
-        public EndCapProfileList endCaps = new EndCapProfileList();
-        
-        [KSPField(isPersistant=true)]
-        public string endCap;
+       
 
         protected UncheckedMesh CreateEndCapFromProfile(bool top, LinkedList<ProfilePoint> pts, EndCapProfile profile)
         {
@@ -1006,7 +1099,20 @@ namespace ProceduralParts
                 for (int i = 0; i < vertCount; i++)
                 {
                     ShapeCoordinates coords = new ShapeCoordinates();
-                    coords.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+                    //coords.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+
+                    switch(pp.HeightMode)
+                    {
+                        case EndCapProfile.YMode.RELATIVE:
+                            coords.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+                            break;
+                        case EndCapProfile.YMode.OFFSET:
+                            coords.HeightMode = top ? ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_TOP : ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_BOTTOM;
+                            break;
+                        case EndCapProfile.YMode.OFFSET_FROM_CENTER:
+                            coords.HeightMode = ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_CENTER;
+                            break;
+                    }
 
                     switch(pp.RadiusMode)
                     {
@@ -1016,6 +1122,10 @@ namespace ProceduralParts
 
                         case EndCapProfile.RMode.RELATIVE_TO_SHAPE_RADIUS:
                             coords.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_SHAPE_RADIUS;
+                            break;
+
+                        case EndCapProfile.RMode.OFFSET_TO_CAP_RADIUS:
+                            coords.RadiusMode = top ? ShapeCoordinates.RMode.OFFSET_FROM_TOP_RADIUS : ShapeCoordinates.RMode.OFFSET_FROM_BOTTOM_RADIUS;
                             break;
                     }
                     
@@ -1044,16 +1154,16 @@ namespace ProceduralParts
                 RingMeshBuilder.EdgeMode edgeMode;
                 switch(pp.EdgeMode)
                 {
-                    case EndCapProfile.EdgeMode.Sharp:
+                    case EndCapProfile.EdgeMode.SHARP:
                         edgeMode = RingMeshBuilder.EdgeMode.Sharp;
                         break;
-                    case EndCapProfile.EdgeMode.SharpSeam:
+                    case EndCapProfile.EdgeMode.SHARP_SEAM:
                         edgeMode = RingMeshBuilder.EdgeMode.SharpSeam;
                         break;
-                    case EndCapProfile.EdgeMode.Smooth:
+                    case EndCapProfile.EdgeMode.SMOOTH:
                         edgeMode = RingMeshBuilder.EdgeMode.Smooth;
                         break;
-                    case EndCapProfile.EdgeMode.SmoothSeam:
+                    case EndCapProfile.EdgeMode.SMOOTH_SEAM:
                         edgeMode = RingMeshBuilder.EdgeMode.SmoothSeam;
                         break;
                     default:
@@ -1064,7 +1174,7 @@ namespace ProceduralParts
                 meshBuilder.AddRing(positions, uv1, uv2, edgeMode);
             }
 
-            UncheckedMesh m = meshBuilder.BuildMesh(!top, true);
+            UncheckedMesh m = meshBuilder.BuildMesh(!top, profile.closeFirstRing);
 
             return m;
         }
@@ -1467,6 +1577,125 @@ namespace ProceduralParts
             }
 
         }
+        #endregion
+
+
+        #region End Caps
+
+        public EndCapProfileList endCaps;
+
+        [SerializeField]
+        public byte[] endCapsSerialized;
+
+        [KSPField(guiName = "End Cap", guiActive = false, guiActiveEditor = true, isPersistant = true), UI_ChooseOption(scene = UI_Scene.Editor)]
+        public string endCap;
+        public string previousEndCap;
+
+        private EndCapProfile selectedEndCap;
+
+
+        public void UpdateEndCaps(bool force = false)
+        {
+            if(force || endCap != previousEndCap)
+            {
+                if(endCaps.EndCapProfiles.Count < 1)
+                    return;
+
+                if (endCaps.EndCapProfiles.Count == 1)
+                {
+                    selectedEndCap = endCaps.EndCapProfiles[0];
+                    endCap = selectedEndCap.name;
+                }
+                else
+                {
+                    selectedEndCap = endCaps.EndCapProfiles.FirstOrDefault(x => x.name == endCap);
+
+                    if (selectedEndCap == null)
+                    {
+                        selectedEndCap = endCaps.EndCapProfiles[0];
+                        endCap = selectedEndCap.name;
+                    }
+                }
+                                   
+                //Debug.Log("selected end cap: " + selectedEndCap.name);
+                //Debug.Log("tex: " + selectedEndCap.texture);
+                //Debug.Log("bump: " + selectedEndCap.bump);
+               
+                UpdateEndCapsTexture();
+                this.UpdateShape(true);
+                previousEndCap = endCap;
+            }
+
+        }
+
+        public void UpdateEndCapsTexture()
+        {
+            Debug.Log("Update end caps tex");
+            Material EndsMaterial;
+            
+            if (HighLogic.LoadedScene == GameScenes.LOADING)
+            {
+                // if we are in loading screen, all changes have to be made to the icon materials. Otherwise all icons will have the same texture 
+                EndsMaterial = PPart.EndsIconMaterial;
+               
+            }
+            else
+            {
+                EndsMaterial = PPart.EndsMaterial;
+            }
+
+            Texture[] textures = Resources.FindObjectsOfTypeAll(typeof(Texture)) as Texture[];
+            
+            Texture tex = null;
+            Texture bump = null;
+
+            if (selectedEndCap != null)
+            {
+                tex = textures.FirstOrDefault(x => x.name == selectedEndCap.texture);
+                bump = textures.FirstOrDefault(x => x.name == selectedEndCap.bump);
+            }
+            else
+            {
+                ProceduralPart.TextureSet textureSet = PPart.TextureSets.FirstOrDefault(set => set.name == PPart.textureSet);
+
+                if(textureSet != null)
+                {
+                    tex = textureSet.ends;
+                    bump = null;
+                }
+            }
+
+            // Set shaders
+            if (!part.Modules.Contains("ModulePaintable"))
+            {
+                Shader newShader = Shader.Find(bump != null ? "KSP/Bumped Specular" : "KSP/Specular");
+                Debug.Log("new shader: " + newShader.name);
+                if (newShader != null)
+                    EndsMaterial.shader = newShader;
+                else
+                {
+                    Debug.LogError("Could not find shader");
+                }
+            }
+
+            if (null != tex)
+                EndsMaterial.SetTexture("_MainTex", tex);
+            else
+                Debug.Log("Could not find texture: " + selectedEndCap.texture);
+
+            if (null != bump)
+                EndsMaterial.SetTexture("_BumpMap", bump);
+            else
+                Debug.Log("Could not find bump tex: " + selectedEndCap.bump);
+
+            EndsMaterial.SetColor("_SpecColor", selectedEndCap.specular);
+            EndsMaterial.SetFloat("_Shininess", selectedEndCap.shininess);
+            
+            
+            //EndsMaterial.SetTexture("_MainTex", tex.ends);
+            
+        }
+
         #endregion
 
     }

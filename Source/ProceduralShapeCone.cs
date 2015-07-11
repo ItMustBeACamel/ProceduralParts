@@ -84,6 +84,7 @@ namespace ProceduralParts
 
         public override void OnStart(StartState state)
         {
+            base.OnStart(state);
             UpdateTechConstraints();
 
         }

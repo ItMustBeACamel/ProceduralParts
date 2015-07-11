@@ -166,7 +166,7 @@ namespace ProceduralParts
             }
         }
 
-        public void OnUpdateEditor()
+        public virtual void OnUpdateEditor()
         {
             try
             {
