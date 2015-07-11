@@ -96,7 +96,11 @@ namespace ProceduralParts
             Rings.Add(new Ring(positions, uv1, uv2, edge));
         }
 
-        public UncheckedMesh BuildMesh(bool invertFaces = false, bool encloseFirstRing = false, bool encloseLastRing = false)
+        public UncheckedMesh BuildMesh(bool invertFaces = false, 
+                                        bool encloseFirstRing = false, 
+                                        bool encloseLastRing = false, 
+                                        bool invertFirstClosure = false,
+                                        bool invertLastClosure = false)
         {
 
             List<InterRing> interRings = new List<InterRing>();
@@ -219,7 +223,7 @@ namespace ProceduralParts
                 
                 for(int i = 1; i < vertPerRing-1; i++)
                 {
-                    if (!invertFaces)
+                    if (invertFirstClosure ? invertFaces : !invertFaces)
                     {
                         triangles.Add(vertOffset);
                         triangles.Add(vertOffset + i + 1);
@@ -235,6 +239,60 @@ namespace ProceduralParts
 
 
             }
+
+
+            if (encloseLastRing)
+            {
+                int vertOffset = 0;
+
+                int ringIndex = Rings.Count - 1;
+                int interRingIndex = interRings.Count - 1;
+
+                switch (Rings[ringIndex].EdgeMode)
+                {
+                    case EdgeMode.Smooth:
+                        vertOffset = interRings[interRingIndex].VertOffset2;
+                        break;
+
+                    case EdgeMode.Sharp:
+                        vertOffset = positions.Count;
+                        positions.AddRange(Rings[ringIndex].Positions);
+                        uvs.AddRange(Rings[ringIndex].UV1);
+                        break;
+
+                    case EdgeMode.SharpSeam:
+                    case EdgeMode.SmoothSeam:
+                        vertOffset = positions.Count;
+                        positions.AddRange(Rings[ringIndex].Positions);
+                        uvs.AddRange(Rings[ringIndex].UV2);
+                        break;
+                    default:
+                        Debug.LogError("unhandled edge mode");
+                        break;
+
+                }
+
+                for (int i = 1; i < vertPerRing - 1; i++)
+                {
+                    if (invertLastClosure ? invertFaces : !invertFaces)
+                    {
+                        triangles.Add(vertOffset);
+                        triangles.Add(vertOffset + i + 1);
+                        triangles.Add(vertOffset + i);
+                    }
+                    else
+                    {
+                        triangles.Add(vertOffset);
+                        triangles.Add(vertOffset + i);
+                        triangles.Add(vertOffset + i + 1);
+                    }
+                }
+
+
+            }
+
+
+            ////////////////////////////////////////////////////////////////
 
             Vector3[] normals = new Vector3[positions.Count];
             CalculateNormals(positions.ToArray(), triangles.ToArray(), normals);

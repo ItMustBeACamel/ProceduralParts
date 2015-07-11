@@ -894,11 +894,11 @@ namespace ProceduralParts
                 UncheckedMesh bottom = null;
                 
                 if(selectedEndCap.createTop)
-                    top = CreateEndCapFromProfile(true, pts, selectedEndCap);
+                    top = CreateEndCapFromProfile(true, pts, selectedEndCap, selectedEndCap.invertFaces);
                
                
                 if(selectedEndCap.createBottom)
-                    bottom = CreateEndCapFromProfile(false, pts, selectedEndCap);
+                    bottom = CreateEndCapFromProfile(false, pts, selectedEndCap,selectedEndCap.invertFaces);
 
                 if(top != null && bottom != null)
                     m = top.Combine(bottom);
@@ -1073,18 +1073,20 @@ namespace ProceduralParts
 
        
 
-        protected UncheckedMesh CreateEndCapFromProfile(bool top, LinkedList<ProfilePoint> pts, EndCapProfile profile)
+        protected UncheckedMesh CreateEndCapFromProfile(bool top, LinkedList<ProfilePoint> pts, EndCapProfile profile, bool invertFaces = false)
         {
             ProfilePoint profilePoint = top ? pts.Last.Value : pts.First.Value;
 
             Vector3[] vertices = new Vector3[profilePoint.circ.totVertexes];
 
-            bool odd = false;
+            //bool odd = false;
 
+            bool odd = top ? pts.Count % 2 == 0 : false;
 
-            odd = top ? pts.Count % 2 == 0 : false;
+            if (!invertFaces && profile.ProfilePoints.Count % 2 == 0)
+                odd = !odd;
 
-            profilePoint.circ.WriteEndcapVerticies(profilePoint.dia, profilePoint.y, 0, vertices, odd);
+            //profilePoint.circ.WriteEndcapVerticies(profilePoint.dia, profilePoint.y, 0, vertices, odd);
 
             int vertCount = vertices.Length;
 
@@ -1096,6 +1098,8 @@ namespace ProceduralParts
 
             foreach(EndCapProfile.EndCapProfilePoint pp in profile.ProfilePoints)
             {
+                profilePoint.circ.WriteEndcapVerticies(profilePoint.dia, profilePoint.y, 0, vertices, odd);
+
                 for (int i = 0; i < vertCount; i++)
                 {
                     ShapeCoordinates coords = new ShapeCoordinates();
@@ -1172,9 +1176,15 @@ namespace ProceduralParts
                 }
 
                 meshBuilder.AddRing(positions, uv1, uv2, edgeMode);
+
+                odd = !odd;
             }
 
-            UncheckedMesh m = meshBuilder.BuildMesh(!top, profile.closeFirstRing);
+            UncheckedMesh m = meshBuilder.BuildMesh(!invertFaces ? !top : top, 
+                                                    profile.closeFirstRing, 
+                                                    profile.closeLastRing, 
+                                                    profile.invertFirstClosure, 
+                                                    profile.invertLastClosure);
 
             return m;
         }

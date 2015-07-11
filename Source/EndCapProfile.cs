@@ -69,10 +69,22 @@ namespace ProceduralParts
         public bool closeFirstRing = true;
 
         [Persistent]
+        public bool closeLastRing = false;
+
+        [Persistent]
         public bool createTop = true;
 
         [Persistent]
         public bool createBottom = true;
+
+        [Persistent]
+        public bool invertFaces = false;
+
+        [Persistent]
+        public bool invertFirstClosure = false;
+
+        [Persistent]
+        public bool invertLastClosure = false;
 
         public enum EdgeMode
         {
@@ -179,7 +191,7 @@ namespace ProceduralParts
             {                
                 EndCapProfilePoint newPoint = new EndCapProfilePoint(s);
                 ProfilePoints.Add(newPoint);
-                Debug.LogWarning("Loaded key: " + newPoint);
+                //Debug.LogWarning("Loaded key: " + newPoint);
             }
 
             if(node.HasNode("specular"))
@@ -191,7 +203,7 @@ namespace ProceduralParts
             foreach (EndCapProfilePoint pp in ProfilePoints)
             {
                 node.AddValue("key", pp.ToString());
-                Debug.LogWarning("Loaded key: " + pp.ToString());
+                //Debug.LogWarning("Saved key: " + pp.ToString());
             }
         }
     }
