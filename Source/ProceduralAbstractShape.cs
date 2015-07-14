@@ -59,9 +59,14 @@ namespace ProceduralParts
             get { return PPart.SidesMesh; }
         }
 
-        public Mesh EndsMesh
+        public Mesh EndsMeshTop
         {
-            get { return PPart.EndsMesh; }
+            get { return PPart.EndsMeshTop; }
+        }
+
+        public Mesh EndsMeshBottom
+        {
+            get { return PPart.EndsMeshBottom; }
         }
         #endregion
 

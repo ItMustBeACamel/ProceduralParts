@@ -15,7 +15,7 @@ namespace ProceduralParts
         {
             base.OnLoad(node);
             Debug.LogWarning("OnLoad Shape");
-            endCaps = new EndCapProfileList();
+            endCaps = new EndCapList();
 
             ConfigNode endCapsNode = node.GetNode("END_CAPS");
 
@@ -59,7 +59,7 @@ namespace ProceduralParts
                 BaseField field = Fields["endCap"];
                 UI_ChooseOption range = (UI_ChooseOption)field.uiControlEditor;
 
-                range.options = endCaps.EndCapProfiles.Select(x => x.name).ToArray();
+                range.options = endCaps.EndCaps.Select(x => x.name).ToArray();
             }
             else
                 Debug.LogWarning("endCapSerialized == null");
@@ -887,47 +887,102 @@ namespace ProceduralParts
             //else
             //    Debug.Log("endCaps == null");
 
-            if (selectedEndCap != null && selectedEndCap.ProfilePoints.Count >= 2)
-            {
+            UncheckedMesh top = null;
+            UncheckedMesh bottom = null;
 
-                UncheckedMesh top = null;
-                UncheckedMesh bottom = null;
-                
-                if(selectedEndCap.createTop)
-                    top = CreateEndCapFromProfile(true, pts, selectedEndCap, selectedEndCap.invertFaces);
+            //if (selectedEndCaps != null /* && selectedEndCap.ProfilePoints.Count >= 2*/)
+            //{
+                if(selectedEndCaps == null || selectedEndCaps.topCap == null)
+                {
+                    Debug.Log("Create default top cap");
+                    int nVertices = last.circ.totVertexes;
+                    int nTriangles = last.circ.totVertexes - 2;
+                    top = new UncheckedMesh(nVertices, nTriangles);
+                    last.circ.WriteEndcap(last.dia, last.y, true, 0, 0, top, !odd);
+                }
+                else
+                {
+                    if (selectedEndCaps != null && selectedEndCaps.topCap.ProfilePoints.Count >= 2)
+                    {
+                        Debug.Log("Create custom top cap");
+                        top = CreateEndCapFromProfile(true, pts, selectedEndCaps.topCap, selectedEndCaps.topCap.invertFaces);
+                    }
+                    else
+                    {
+                        Debug.Log("Do not create top cap");
+                        // TODO, no end cap at the top
+                    }
+                }
+
+                if (selectedEndCaps == null || selectedEndCaps.bottomCap == null)
+                {
+                    Debug.Log("Create default bottom cap");
+                    int nVertices = first.circ.totVertexes;
+                    int nTriangles = first.circ.totVertexes - 2;
+                    bottom = new UncheckedMesh(nVertices, nTriangles);
+                    first.circ.WriteEndcap(first.dia, first.y, false, 0, 0, bottom, false);
+                }
+                else
+                {
+                    if (selectedEndCaps != null && selectedEndCaps.bottomCap.ProfilePoints.Count >= 2)
+                    {
+                        Debug.Log("Create custom bottom cap");
+                        bottom = CreateEndCapFromProfile(false, pts, selectedEndCaps.bottomCap, selectedEndCaps.bottomCap.invertFaces);
+                    }
+                    else
+                    {
+                        Debug.Log("Do not create bottom cap");
+                        // TODO no end cap at the bottom
+                    }
+                }
+          
+                //if(selectedEndCap.createTop)
+                //    top = CreateEndCapFromProfile(true, pts, selectedEndCap, selectedEndCap.invertFaces);
                
                
-                if(selectedEndCap.createBottom)
-                    bottom = CreateEndCapFromProfile(false, pts, selectedEndCap,selectedEndCap.invertFaces);
+                //if(selectedEndCap.createBottom)
+                //    bottom = CreateEndCapFromProfile(false, pts, selectedEndCap,selectedEndCap.invertFaces);
 
-                if(top != null && bottom != null)
-                    m = top.Combine(bottom);
+                //if(top != null && bottom != null)
+                //    m = top.Combine(bottom);
+                //else
+                //{
+                //    if (top != null)
+                //        m = top;
+                //    if (bottom != null)
+                //        m = bottom;
+                //}
+
+            //}
+            //else
+            //{
+            //    // Write default endcaps.         
+            //    nVrt = first.circ.totVertexes + last.circ.totVertexes;
+            //    nTri = first.circ.totVertexes - 2 + last.circ.totVertexes - 2;
+            //    m = new UncheckedMesh(nVrt, nTri);
+
+            //    first.circ.WriteEndcap(first.dia, first.y, false, 0, 0, m, false);
+            //    last.circ.WriteEndcap(last.dia, last.y, true, first.circ.totVertexes, (first.circ.totVertexes - 2) * 3, m, !odd);
+            //}
+
+
+
+                if (HighLogic.LoadedScene == GameScenes.LOADING)
+                {
+                    //m.WriteTo(PPart.EndsIconMesh);
+                    if (top != null)
+                        top.WriteTo(PPart.EndsIconMeshTop);
+                    if (bottom != null)
+                        bottom.WriteTo(PPart.EndsIconMeshBottom);
+                }
                 else
                 {
                     if (top != null)
-                        m = top;
+                        top.WriteTo(PPart.EndsMeshTop);
                     if (bottom != null)
-                        m = bottom;
+                        bottom.WriteTo(PPart.EndsMeshBottom);
+                    //m.WriteTo(EndsMesh);
                 }
-
-            }
-            else
-            {
-                // Write default endcaps.         
-                nVrt = first.circ.totVertexes + last.circ.totVertexes;
-                nTri = first.circ.totVertexes - 2 + last.circ.totVertexes - 2;
-                m = new UncheckedMesh(nVrt, nTri);
-
-                first.circ.WriteEndcap(first.dia, first.y, false, 0, 0, m, false);
-                last.circ.WriteEndcap(last.dia, last.y, true, first.circ.totVertexes, (first.circ.totVertexes - 2) * 3, m, !odd);
-            }
-
-
-
-            if (HighLogic.LoadedScene == GameScenes.LOADING)
-                m.WriteTo(PPart.EndsIconMesh);
-            else
-                m.WriteTo(EndsMesh);
 
             // build the collider mesh at a lower resolution than the visual mesh.
             if (true)//customCollider) // always build a custom collider because the sides mesh does not contain end caps. Which is bad.
@@ -1068,7 +1123,7 @@ namespace ProceduralParts
             RaiseChangeAttachNodeSize(node, pt.dia, Mathf.PI * pt.dia * pt.dia * 0.25f);
 
             // TODO: separate out the meshes for each end so we can use the scale for texturing.
-            RaiseChangeTextureScale(nodeName, PPart.EndsMaterial, new Vector2(pt.dia, pt.dia));
+            RaiseChangeTextureScale(nodeName, PPart.EndsMaterialTop, new Vector2(pt.dia, pt.dia));
         }
 
        
@@ -1592,7 +1647,7 @@ namespace ProceduralParts
 
         #region End Caps
 
-        public EndCapProfileList endCaps;
+        public EndCapList endCaps;
 
         [SerializeField]
         public byte[] endCapsSerialized;
@@ -1601,29 +1656,29 @@ namespace ProceduralParts
         public string endCap;
         public string previousEndCap;
 
-        private EndCapProfile selectedEndCap;
+        private EndCaps selectedEndCaps;
 
 
         public void UpdateEndCaps(bool force = false)
         {
             if(force || endCap != previousEndCap)
             {
-                if(endCaps.EndCapProfiles.Count < 1)
+                if(endCaps.EndCaps.Count < 1)
                     return;
 
-                if (endCaps.EndCapProfiles.Count == 1)
+                if (endCaps.EndCaps.Count == 1)
                 {
-                    selectedEndCap = endCaps.EndCapProfiles[0];
-                    endCap = selectedEndCap.name;
+                    selectedEndCaps = endCaps.EndCaps[0];
+                    endCap = selectedEndCaps.name;
                 }
                 else
                 {
-                    selectedEndCap = endCaps.EndCapProfiles.FirstOrDefault(x => x.name == endCap);
+                    selectedEndCaps = endCaps.EndCaps.FirstOrDefault(x => x.name == endCap);
 
-                    if (selectedEndCap == null)
+                    if (selectedEndCaps == null)
                     {
-                        selectedEndCap = endCaps.EndCapProfiles[0];
-                        endCap = selectedEndCap.name;
+                        selectedEndCaps = endCaps.EndCaps[0];
+                        endCap = selectedEndCaps.name;
                     }
                 }
                                    
@@ -1641,28 +1696,37 @@ namespace ProceduralParts
         public void UpdateEndCapsTexture()
         {
             Debug.Log("Update end caps tex");
-            Material EndsMaterial;
+            Material EndsMaterialTop;
+            Material EndsMaterialBottom;
             
             if (HighLogic.LoadedScene == GameScenes.LOADING)
             {
                 // if we are in loading screen, all changes have to be made to the icon materials. Otherwise all icons will have the same texture 
-                EndsMaterial = PPart.EndsIconMaterial;
+                EndsMaterialTop = PPart.EndsIconMaterialTop;
+                EndsMaterialBottom = PPart.EndsIconMaterialBottom;
                
             }
             else
             {
-                EndsMaterial = PPart.EndsMaterial;
+                EndsMaterialTop = PPart.EndsMaterialTop;
+                EndsMaterialBottom = PPart.EndsMaterialBottom;
             }
 
             Texture[] textures = Resources.FindObjectsOfTypeAll(typeof(Texture)) as Texture[];
             
-            Texture tex = null;
-            Texture bump = null;
+            Texture texTop = null;
+            Texture texBottom = null;
+            
+            Texture bumpTop = null;
+            Texture bumpBottom = null;
 
-            if (selectedEndCap != null)
+            if (selectedEndCaps != null)
             {
-                tex = textures.FirstOrDefault(x => x.name == selectedEndCap.texture);
-                bump = textures.FirstOrDefault(x => x.name == selectedEndCap.bump);
+                texTop = textures.FirstOrDefault(x => x.name == selectedEndCaps.topCap.texture);
+                texBottom = textures.FirstOrDefault(x => x.name == selectedEndCaps.bottomCap.texture);
+
+                bumpTop = textures.FirstOrDefault(x => x.name == selectedEndCaps.topCap.bump);
+                bumpBottom = textures.FirstOrDefault(x => x.name == selectedEndCaps.bottomCap.bump);
             }
             else
             {
@@ -1670,36 +1734,64 @@ namespace ProceduralParts
 
                 if(textureSet != null)
                 {
-                    tex = textureSet.ends;
-                    bump = null;
+                    texTop = textureSet.ends;
+                    texBottom = textureSet.ends;
+                    bumpTop = null;
+                    bumpBottom = null;
                 }
             }
 
             // Set shaders
             if (!part.Modules.Contains("ModulePaintable"))
             {
-                Shader newShader = Shader.Find(bump != null ? "KSP/Bumped Specular" : "KSP/Specular");
-                Debug.Log("new shader: " + newShader.name);
-                if (newShader != null)
-                    EndsMaterial.shader = newShader;
+                Shader newShaderTop = Shader.Find(bumpTop != null ? "KSP/Bumped Specular" : "KSP/Specular");
+                Shader newShaderBottom = Shader.Find(bumpBottom != null ? "KSP/Bumped Specular" : "KSP/Specular");
+
+                //Debug.Log("new shader: " + newShader.name);
+                if (newShaderTop != null)
+                    EndsMaterialTop.shader = newShaderTop;
                 else
                 {
-                    Debug.LogError("Could not find shader");
+                    Debug.LogError("Could not find shader for top");
+                }
+
+                if (newShaderBottom != null)
+                    EndsMaterialBottom.shader = newShaderBottom;
+                else
+                {
+                    Debug.LogError("Could not find shader for top");
                 }
             }
 
-            if (null != tex)
-                EndsMaterial.SetTexture("_MainTex", tex);
+            if (null != texTop)
+                EndsMaterialTop.SetTexture("_MainTex", texTop);
             else
-                Debug.Log("Could not find texture: " + selectedEndCap.texture);
+                Debug.Log("Could not find texture: " + selectedEndCaps.topCap.texture);
 
-            if (null != bump)
-                EndsMaterial.SetTexture("_BumpMap", bump);
+            if (null != texBottom)
+                EndsMaterialTop.SetTexture("_MainTex", texBottom);
             else
-                Debug.Log("Could not find bump tex: " + selectedEndCap.bump);
+                Debug.Log("Could not find texture: " + selectedEndCaps.bottomCap.texture);
 
-            EndsMaterial.SetColor("_SpecColor", selectedEndCap.specular);
-            EndsMaterial.SetFloat("_Shininess", selectedEndCap.shininess);
+            if (null != bumpTop)
+                EndsMaterialTop.SetTexture("_BumpMap", bumpTop);
+            else
+                Debug.Log("Could not find bump tex: " + selectedEndCaps.topCap.bump);
+
+            if (null != bumpBottom)
+                EndsMaterialTop.SetTexture("_BumpMap", bumpBottom);
+            else
+                Debug.Log("Could not find bump tex: " + selectedEndCaps.bottomCap.bump);
+
+            EndsMaterialTop.SetColor("_SpecColor", selectedEndCaps.topCap.specular);
+            EndsMaterialBottom.SetColor("_SpecColor", selectedEndCaps.bottomCap.specular);
+            
+            EndsMaterialTop.SetFloat("_Shininess", selectedEndCaps.topCap.shininess);
+            EndsMaterialBottom.SetFloat("_Shininess", selectedEndCaps.bottomCap.shininess);
+
+            EndsMaterialTop.SetTextureScale("_MainTex", selectedEndCaps.topCap.textureScale);
+            EndsMaterialBottom.SetTextureScale("_MainTex", selectedEndCaps.bottomCap.textureScale);
+            Debug.Log("scale: " + selectedEndCaps.topCap.textureScale);
             
             
             //EndsMaterial.SetTexture("_MainTex", tex.ends);

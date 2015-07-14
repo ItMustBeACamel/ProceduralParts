@@ -191,22 +191,29 @@ namespace ProceduralParts
         public string sidesName = "sides";
 
         [KSPField]
-        public string endsName = "ends";
+        public string endsNameTop = "endsTop";
+
+        [KSPField]
+        public string endsNameBottom = "endsBottom";
 
         [KSPField]
         public string collisionName = "collisionMesh";
 
         public Material SidesMaterial { get; private set; }
-        public Material EndsMaterial { get; private set; }
+        public Material EndsMaterialTop { get; private set; }
+        public Material EndsMaterialBottom { get; private set; }
 
         public Mesh SidesMesh { get; private set; }
-        public Mesh EndsMesh { get; private set; }
+        public Mesh EndsMeshTop { get; private set; }
+        public Mesh EndsMeshBottom { get; private set; }
 
         public Material SidesIconMaterial { get; private set; }
-        public Material EndsIconMaterial { get; private set; }
+        public Material EndsIconMaterialTop { get; private set; }
+        public Material EndsIconMaterialBottom { get; private set; }
 
         public Mesh SidesIconMesh { get; private set; }
-        public Mesh EndsIconMesh { get; private set; }
+        public Mesh EndsIconMeshTop { get; private set; }
+        public Mesh EndsIconMeshBottom { get; private set; }
 
         private Transform partModel;
 
@@ -214,30 +221,63 @@ namespace ProceduralParts
         {
             partModel = part.FindModelTransform(partModelName);
             
-            Transform sides     = part.FindModelTransform(sidesName);
-            Transform ends      = part.FindModelTransform(endsName);
-            Transform colliderTr = part.FindModelTransform(collisionName);
+            Transform sides        = part.FindModelTransform(sidesName);
+            Transform endsTop      = part.FindModelTransform(endsNameTop);
+            Transform endsBottom   = part.FindModelTransform(endsNameBottom);
+            Transform colliderTr   = part.FindModelTransform(collisionName);
 
             Transform iconModelTransform = part.partInfo.iconPrefab.transform.FindDecendant("model");
 
             Transform iconSides = iconModelTransform.FindDecendant(sidesName);
-            Transform iconEnds = iconModelTransform.FindDecendant(endsName);
+            Transform iconEndsTop = iconModelTransform.FindDecendant(endsNameTop);
+            Transform iconEndsBottom = iconModelTransform.FindDecendant(endsNameBottom);
 
-            if(iconSides != null)
+            if (iconSides != null)
                 SidesIconMesh = iconSides.GetComponent<MeshFilter>().mesh;
-            if(iconEnds != null)
-                EndsIconMesh = iconEnds.GetComponent<MeshFilter>().mesh;
+            else
+                Debug.LogError("Could not find icon sides transform");
+
+            if(iconEndsTop != null)
+                EndsIconMeshTop = iconEndsTop.GetComponent<MeshFilter>().mesh;
+            else
+                Debug.LogError("Could not find icon top ends transform");
+
+            if (iconEndsBottom != null)
+                EndsIconMeshBottom = iconEndsBottom.GetComponent<MeshFilter>().mesh;
+            else
+                Debug.LogError("Could not find icon bottom ends transform");
+
 
 
             SidesMaterial = sides.renderer.material;
-            EndsMaterial = ends.renderer.material;
+            EndsMaterialTop = endsTop.renderer.material;
+            EndsMaterialBottom = endsBottom.renderer.material;
+
+
             SidesIconMaterial = iconSides.renderer.material;
-            EndsIconMaterial = iconEnds.renderer.material;
+            EndsIconMaterialTop = iconEndsTop.renderer.material;
+            EndsIconMaterialBottom = iconEndsBottom.renderer.material;
 
             // Instantiate meshes. The mesh method unshares any shared meshes.
-            SidesMesh = sides.GetComponent<MeshFilter>().mesh;
-            EndsMesh = ends.GetComponent<MeshFilter>().mesh;
-            partCollider = colliderTr.GetComponent<MeshCollider>();
+            if (sides != null)
+                SidesMesh = sides.GetComponent<MeshFilter>().mesh;
+            else
+                Debug.LogError("could not find sides transform");
+
+            if(endsTop != null)
+                EndsMeshTop = endsTop.GetComponent<MeshFilter>().mesh;
+            else
+                Debug.LogError("could not find top ends transform");
+
+            if(endsBottom != null)
+                EndsMeshBottom = endsBottom.GetComponent<MeshFilter>().mesh;
+            else
+                Debug.LogError("could not find bottom ends transform");
+
+            if(colliderTr != null)
+                partCollider = colliderTr.GetComponent<MeshCollider>();
+            else
+                Debug.LogError("could not find collider transform");
 
             // Will need to destroy any old transform offset followers, they will be rebuilt in due course
             if (symmetryClone)
@@ -743,18 +783,24 @@ namespace ProceduralParts
             if (textureSet == oldTextureSet)
                 return;
             //Debug.Log("update texture");
-            Material EndsMaterial;
+            Material EndsMaterialTop;
+            Material EndsMaterialBottom;
+
             Material SidesMaterial;
 
             if(HighLogic.LoadedScene== GameScenes.LOADING)
             {
                 // if we are in loading screen, all changes have to be made to the icon materials. Otherwise all icons will have the same texture 
-                EndsMaterial = this.EndsIconMaterial;
+                EndsMaterialTop = this.EndsIconMaterialTop;
+                EndsMaterialBottom = this.EndsIconMaterialBottom;
+
                 SidesMaterial = this.SidesIconMaterial;
             }
             else
             {
-                EndsMaterial = this.EndsMaterial;
+                EndsMaterialTop = this.EndsMaterialTop;
+                EndsMaterialBottom = this.EndsMaterialBottom;
+
                 SidesMaterial = this.SidesMaterial;
             }
 
@@ -775,22 +821,22 @@ namespace ProceduralParts
                 SidesMaterial.shader = Shader.Find(tex.sidesBump != null ? "KSP/Bumped Specular" : "KSP/Specular");
 
                 // pt is no longer specular ever, just diffuse.
-                // update: end caps now controlled by shapes
-                //if (EndsMaterial != null)
+                // update: end caps now controlled by shapes (if endcap defined)
+                //if (EndsMaterialTop != null && )
                 //    EndsMaterial.shader = Shader.Find("KSP/Diffuse");
             }
-
+            
             SidesMaterial.SetColor("_SpecColor", tex.sidesSpecular);
             SidesMaterial.SetFloat("_Shininess", tex.sidesShininess);
 
             // TODO: shove into config file.
-            if (EndsMaterial != null)
-            {
-                const float scale = 0.93f;
-                const float offset = (1f / scale - 1f) / 2f;
-                EndsMaterial.mainTextureScale = new Vector2(scale, scale);
-                EndsMaterial.mainTextureOffset = new Vector2(offset, offset);
-            }
+            //if (EndsMaterial != null)
+            //{
+            //    const float scale = 0.93f;
+            //    const float offset = (1f / scale - 1f) / 2f;
+            //    EndsMaterial.mainTextureScale = new Vector2(scale, scale);
+            //    EndsMaterial.mainTextureOffset = new Vector2(offset, offset);
+            //}
 
             // set up UVs
             Vector2 scaleUV = tex.scale;

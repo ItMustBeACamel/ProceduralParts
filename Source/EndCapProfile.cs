@@ -8,41 +8,35 @@ using KSPAPIExtensions;
 namespace ProceduralParts
 {
     [Serializable]
-    public class EndCapProfileList : IConfigNode
-    {
-        
-        public List<EndCapProfile> EndCapProfiles = new List<EndCapProfile>();
-
-        public float blubb;
+    public class EndCapList : IConfigNode
+    {     
+        public List<EndCaps> EndCaps = new List<EndCaps>();
 
         public void Load(ConfigNode node)
         {
-            Debug.LogWarning("ProfileList Load");
-            ConfigNode[] nodes = node.GetNodes("END_CAP");
-
-            //if (!float.TryParse(node.GetValue("blubb"), out blubb))
-            //    Debug.LogError("could not parse blubb");
+            Debug.LogWarning("EndCapList Load");
+            ConfigNode[] nodes = node.GetNodes("CAPS");
 
             foreach(ConfigNode n in nodes)
             {
                 //EndCapProfiles.Add(ConfigNode.CreateObjectFromConfig<EndCapProfile>(n));
-                string name = typeof(EndCapProfile).AssemblyQualifiedName;
-                EndCapProfile newProfile = (EndCapProfile)ConfigNode.CreateObjectFromConfig(name, n);
-                newProfile.Load(n);
-                EndCapProfiles.Add(newProfile);
+                string name = typeof(EndCaps).AssemblyQualifiedName;
+                EndCaps newCaps = (EndCaps)ConfigNode.CreateObjectFromConfig(name, n);
+                newCaps.Load(n);
+                EndCaps.Add(newCaps);
             }
    
         }
 
         public void Save(ConfigNode node)
         {
-            Debug.LogWarning("ProfileList Save");
-            //node.AddValue("blubb", blubb);
-            foreach(EndCapProfile p in EndCapProfiles)
+            Debug.LogWarning("EndCapList Save");
+            
+            foreach(EndCaps ec in EndCaps)
             {
-                ConfigNode n = ConfigNode.CreateConfigFromObject(p);
-                p.Save(n);
-                node.AddNode("END_CAP",n);
+                ConfigNode n = ConfigNode.CreateConfigFromObject(ec);
+                ec.Save(n);
+                node.AddNode("CAPS",n);
             }          
         }
     }
@@ -50,14 +44,17 @@ namespace ProceduralParts
     [Serializable]
     public class EndCapProfile : IConfigNode
     {
-        [Persistent]
-        public string name = "*";
+        //[Persistent]
+        //public string name = "*";
 
         [Persistent]
         public string texture;
 
         [Persistent]
         public string bump;
+
+        [NonSerialized]
+        public Vector2 textureScale = new Vector2(0.93f, 0.93f);
 
         [Persistent]
         public float shininess = 0.4f;
@@ -72,10 +69,10 @@ namespace ProceduralParts
         public bool closeLastRing = false;
 
         [Persistent]
-        public bool createTop = true;
+        public bool doNotCreate = false;
 
-        [Persistent]
-        public bool createBottom = true;
+        //[Persistent]
+        //public bool createBottom = true;
 
         [Persistent]
         public bool invertFaces = false;
@@ -177,11 +174,8 @@ namespace ProceduralParts
             }
         }
 
-        //[NonSerialized]
+        
         public List<EndCapProfilePoint> ProfilePoints = new List<EndCapProfilePoint>();
-
-        
-        
 
         public void Load(ConfigNode node)
         {
@@ -196,6 +190,14 @@ namespace ProceduralParts
 
             if(node.HasNode("specular"))
               specular = ConfigNode.ParseColor(node.GetNode("sides").GetValue("specular"));
+
+            if(node.HasValue("textureScale"))
+            {
+                Vector3 scale;
+                if (ParseUtils.TryParseVector3(node.GetValue("textureScale"), out scale))
+                    textureScale = scale.xy2();
+            }
+            //Debug.LogWarning("texture scale: " + textureScale);
         }
 
         public void Save(ConfigNode node)
@@ -204,6 +206,87 @@ namespace ProceduralParts
             {
                 node.AddValue("key", pp.ToString());
                 //Debug.LogWarning("Saved key: " + pp.ToString());
+                node.AddValue("textureScale", textureScale.toVec3(0.0f));
+
+            }
+        }
+    }
+
+    [Serializable]
+    public class EndCaps : IConfigNode
+    {
+
+        [Persistent]
+        public string name = "***";
+
+        [Persistent]
+        public EndCapProfile topCap;
+        
+        public EndCapProfile bottomCap;
+
+        public void Load(ConfigNode node)
+        {
+            ConfigNode bothNode;
+            string className = typeof(EndCapProfile).AssemblyQualifiedName;
+            if(node.TryGetNode("BOTH", out bothNode))
+            {         
+                EndCapProfile newProfile = (EndCapProfile)ConfigNode.CreateObjectFromConfig(className, bothNode);
+                newProfile.Load(bothNode);
+                topCap = newProfile;
+                bottomCap = newProfile;
+            }
+            else
+            {
+                ConfigNode topNode;
+                ConfigNode bottomNode;
+
+                if (node.TryGetNode("TOP", out topNode))
+                {
+                    EndCapProfile newProfile = (EndCapProfile)ConfigNode.CreateObjectFromConfig(className, topNode);
+                    newProfile.Load(topNode);
+                    topCap = newProfile;
+                }
+                else
+                    topCap = null;
+
+                if (node.TryGetNode("BOTTOM", out bottomNode))
+                {
+                    EndCapProfile newProfile = (EndCapProfile)ConfigNode.CreateObjectFromConfig(className, bottomNode);
+                    newProfile.Load(bottomNode);
+                    bottomCap = newProfile;
+                }
+                else
+                    bottomCap = null;
+            }     
+        }
+
+        public void Save(ConfigNode node)
+        {
+            if(topCap == bottomCap && topCap != null)
+            {
+                ConfigNode bothNode = ConfigNode.CreateConfigFromObject(topCap ?? bottomCap);
+                topCap.Save(bothNode);
+
+                node.AddNode("BOTH", bothNode);
+            }
+            else
+            {
+                if(topCap != null)
+                {
+                    ConfigNode topNode = ConfigNode.CreateConfigFromObject(topCap);
+                    topCap.Save(topNode);
+
+                    node.AddNode("TOP", topNode);
+                }
+
+                if (bottomCap != null)
+                {
+                    ConfigNode bottomNode = ConfigNode.CreateConfigFromObject(bottomCap);
+                    bottomCap.Save(bottomNode);
+
+                    node.AddNode("BOTTOM", bottomNode);
+                }
+
             }
         }
     }

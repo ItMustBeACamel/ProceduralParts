@@ -20,9 +20,19 @@ namespace ProceduralParts
             return new Vector2(v.x, v.z);
         }
 
+        public static Vector2 xy2(this Vector3 v)
+        {
+            return new Vector2(v.x, v.y);
+        }
+
         public static Vector4 toVec4(this Vector3 v, float w)
         {
             return new Vector4(v.x, v.y, v.z, w);
+        }
+
+        public static Vector3 toVec3(this Vector2 v, float z)
+        {
+            return new Vector3(v.x, v.y, z);
         }
 
         public static UncheckedMesh Combine(this UncheckedMesh m1, UncheckedMesh m2)
