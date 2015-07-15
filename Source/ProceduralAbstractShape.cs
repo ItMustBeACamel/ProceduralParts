@@ -271,5 +271,7 @@ namespace ProceduralParts
         }
 
         public abstract void UpdateTechConstraints();
+
+        public abstract void UpdateEndCapsTexture();
     }
 }

@@ -8,7 +8,7 @@ using KSPAPIExtensions;
 namespace ProceduralParts
 {
     [Serializable]
-    public class EndCapList : IConfigNode
+    public class EndCapList : IConfigNode, ISerialize
     {     
         public List<EndCaps> EndCaps = new List<EndCaps>();
 
@@ -39,10 +39,32 @@ namespace ProceduralParts
                 node.AddNode("CAPS",n);
             }          
         }
+
+        public void OnSerialization()
+        {
+            if(EndCaps != null)
+            {
+                foreach(EndCaps ec in EndCaps)
+                {
+                    ec.OnSerialization();
+                }
+            }
+        }
+
+        public void OnDeserialization()
+        {
+            if (EndCaps != null)
+            {
+                foreach (EndCaps ec in EndCaps)
+                {
+                    ec.OnDeserialization();
+                }
+            }
+        }
     }
 
     [Serializable]
-    public class EndCapProfile : IConfigNode
+    public class EndCapProfile : IConfigNode, ISerialize
     {
         //[Persistent]
         //public string name = "*";
@@ -55,12 +77,18 @@ namespace ProceduralParts
 
         [NonSerialized]
         public Vector2 textureScale = new Vector2(0.93f, 0.93f);
+        
+        [Persistent]
+        private string textureScaleSerialized;
 
         [Persistent]
         public float shininess = 0.4f;
         
         [NonSerialized]
         public Color specular = new Color(0.2f, 0.2f, 0.2f);
+
+        [Persistent]
+        private string specularSerialized;
 
         [Persistent]
         public bool closeFirstRing = true;
@@ -188,14 +216,26 @@ namespace ProceduralParts
                 //Debug.LogWarning("Loaded key: " + newPoint);
             }
 
-            if(node.HasNode("specular"))
-              specular = ConfigNode.ParseColor(node.GetNode("sides").GetValue("specular"));
+            if(node.HasValue("specular"))
+              specular = ConfigNode.ParseColor(node.GetValue("specular"));
+               
 
             if(node.HasValue("textureScale"))
             {
-                Vector3 scale;
-                if (ParseUtils.TryParseVector3(node.GetValue("textureScale"), out scale))
-                    textureScale = scale.xy2();
+                //Vector3 scale;
+                //if (ParseUtils.TryParseVector3(node.GetValue("textureScale"), out scale))
+                //    textureScale = scale.xy2();
+
+                //VectorUtils.TryParse(node.GetValue("textureScale"), ref textureScale);
+                try
+                {
+                    textureScale = ConfigNode.ParseVector2(node.GetValue("textureScale"));
+                }
+                catch(Exception)
+                {
+
+                }
+
             }
             //Debug.LogWarning("texture scale: " + textureScale);
         }
@@ -206,20 +246,37 @@ namespace ProceduralParts
             {
                 node.AddValue("key", pp.ToString());
                 //Debug.LogWarning("Saved key: " + pp.ToString());
-                node.AddValue("textureScale", textureScale.toVec3(0.0f));
-
+                node.AddValue("textureScale", ConfigNode.WriteVector(textureScale));
+                node.AddValue("specular", ConfigNode.WriteColor(specular));
             }
+        }
+
+        public void OnSerialization()
+        {     
+            textureScaleSerialized = ConfigNode.WriteVector(textureScale); //.ToString();
+            specularSerialized = specular.ToString();
+        }
+
+        public void OnDeserialization()
+        {    
+            if (!String.IsNullOrEmpty(textureScaleSerialized))       
+                if (!VectorUtils.TryParse(textureScaleSerialized, ref textureScale))
+                    Debug.Log("could not parse textureScale: " + textureScaleSerialized);
+
+            if (!String.IsNullOrEmpty(specularSerialized))
+                if (!ColorUtils.TryParseColor(specularSerialized, ref specular))
+                    Debug.Log("could not parse specular: " + specularSerialized);    
         }
     }
 
     [Serializable]
-    public class EndCaps : IConfigNode
+    public class EndCaps : IConfigNode, ISerialize
     {
 
         [Persistent]
         public string name = "***";
 
-        [Persistent]
+        
         public EndCapProfile topCap;
         
         public EndCapProfile bottomCap;
@@ -288,6 +345,24 @@ namespace ProceduralParts
                 }
 
             }
+        }
+
+        public void OnSerialization()
+        {
+            if (topCap != null)
+                topCap.OnSerialization();
+
+            if (bottomCap != null)
+                bottomCap.OnSerialization();
+        }
+
+        public void OnDeserialization()
+        {
+            if (topCap != null)
+                topCap.OnDeserialization();
+
+            if (bottomCap != null)
+                bottomCap.OnDeserialization();
         }
     }
 

@@ -35,6 +35,30 @@ namespace ProceduralParts
             return new Vector3(v.x, v.y, z);
         }
 
+        public static Vector2 ParseVector2(string s)
+        {
+            s = s.Trim();
+            s = s.Replace("(", "");
+            s = s.Replace(")", "");
+            string[] elements = s.Split(' ', ',', '\t', ';');
+            elements = elements.Where(e => !String.IsNullOrEmpty(e)).ToArray();
+
+            return new Vector2(float.Parse(elements[0]), float.Parse(elements[1]));    
+        }
+
+        public static bool TryParse(string s, ref Vector2 result)
+        {
+            try
+            {
+                result = ParseVector2(s);
+                return true;
+            }
+            catch(Exception)
+            {
+                return false;
+            }
+        }
+
         public static UncheckedMesh Combine(this UncheckedMesh m1, UncheckedMesh m2)
         {
             UncheckedMesh mesh = new UncheckedMesh(m1.nVrt + m2.nVrt, m1.nTri + m2.nTri);
@@ -60,5 +84,75 @@ namespace ProceduralParts
         }
 
 
+    }
+
+
+    public static class ColorUtils
+    {
+        public static bool TryParseColor(string s, ref Color c)
+        {
+            try
+            {
+                c = ParseColor(s);
+                return true;
+            }
+            catch(Exception)
+            {
+                return false;
+            }
+        }
+
+        public static Color ParseColor(string s)
+        {
+            s = s.Trim();
+            string[] a = s.Split('(');
+            
+            string format = a[0];
+            string args = a[1];
+            args = args.Replace(")", "");
+
+            string[] values = args.Split(' ', ',', '\t', ';');
+            values = values.Where(e => !String.IsNullOrEmpty(e)).ToArray();
+
+            Color result = new Color();
+
+            for (int i = 0; i < format.Length; i++)
+            {
+                if (i < values.Length)
+                {
+                    switch(format[i])
+                    {
+                        case 'R':
+                        case 'r':
+                            result.r = float.Parse(values[i]);
+                            break;
+                        
+                        case 'G':
+                        case 'g':
+                            result.g = float.Parse(values[i]);
+                            break;
+
+                        case 'B':
+                        case 'b':
+                            result.b = float.Parse(values[i]);
+                            break;
+
+                        case 'A':
+                        case 'a':
+                            result.a = float.Parse(values[i]);
+                            break;
+                        default:
+                            Debug.LogWarning("Could not parse format Char: " + format[i]);
+                            break;
+                    }
+
+                }
+                else
+                    break;
+            }
+
+            return result;
+
+        }
     }
 }

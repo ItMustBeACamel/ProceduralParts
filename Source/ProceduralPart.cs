@@ -873,6 +873,10 @@ namespace ProceduralParts
             }
             //if (EndsMaterial != null)
             //    EndsMaterial.SetTexture("_MainTex", tex.ends);
+
+            if (CurrentShape != null)
+                CurrentShape.UpdateEndCapsTexture();
+
         }
 
         #endregion
@@ -1402,8 +1406,15 @@ namespace ProceduralParts
                 availableShapes.Add(compShape.displayName, compShape);
                 shapeNames.Add(compShape.displayName);
 
+                if (compShape != null)
+                    Debug.Log("Added available shape: " + compShape.displayName);
+                else
+                    Debug.Log("shape == null");
+
                 if (string.IsNullOrEmpty(shapeName) ? (availableShapes.Count == 1) : compShape.displayName == shapeName)
                 {
+                    if(compShape != null)
+                        Debug.Log("set current shape to: " + compShape.displayName);
                     shape = compShape;
                     oldShapeName = shapeName = shape.displayName;
                     shape.isEnabled = shape.enabled = true;

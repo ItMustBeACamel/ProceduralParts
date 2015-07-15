@@ -48,7 +48,7 @@ namespace ProceduralParts
 
         public override void OnStart(StartState state)
         {
-            Debug.LogWarning("OnStart Shape " + part.ClassName);
+            Debug.LogWarning("OnStart Shape " + displayName);
             
             base.OnStart(state);
             
@@ -70,9 +70,10 @@ namespace ProceduralParts
 
         public override void OnUpdateEditor()
         {
+            UpdateEndCaps();
             base.OnUpdateEditor();
 
-            UpdateEndCaps();
+            
         }
 
         #endregion
@@ -1647,14 +1648,14 @@ namespace ProceduralParts
 
         #region End Caps
 
-        public EndCapList endCaps;
+        public EndCapList endCaps = new EndCapList();
 
         [SerializeField]
         public byte[] endCapsSerialized;
 
         [KSPField(guiName = "End Cap", guiActive = false, guiActiveEditor = true, isPersistant = true), UI_ChooseOption(scene = UI_Scene.Editor)]
         public string endCap;
-        public string previousEndCap;
+        public string previousEndCap = "*__*";
 
         private EndCaps selectedEndCaps;
 
@@ -1663,37 +1664,127 @@ namespace ProceduralParts
         {
             if(force || endCap != previousEndCap)
             {
-                if(endCaps.EndCaps.Count < 1)
-                    return;
-
-                if (endCaps.EndCaps.Count == 1)
-                {
-                    selectedEndCaps = endCaps.EndCaps[0];
-                    endCap = selectedEndCaps.name;
-                }
+                if (endCaps.EndCaps.Count < 1)
+                    selectedEndCaps = null;
                 else
                 {
-                    selectedEndCaps = endCaps.EndCaps.FirstOrDefault(x => x.name == endCap);
 
-                    if (selectedEndCaps == null)
+                    if (endCaps.EndCaps.Count == 1)
                     {
                         selectedEndCaps = endCaps.EndCaps[0];
                         endCap = selectedEndCaps.name;
                     }
+                    else
+                    {
+                        selectedEndCaps = endCaps.EndCaps.FirstOrDefault(x => x.name == endCap);
+
+                        if (selectedEndCaps == null)
+                        {
+                            selectedEndCaps = endCaps.EndCaps[0];
+                            endCap = selectedEndCaps.name;
+                        }
+                    }
                 }
                                    
-                //Debug.Log("selected end cap: " + selectedEndCap.name);
-                //Debug.Log("tex: " + selectedEndCap.texture);
-                //Debug.Log("bump: " + selectedEndCap.bump);
-               
                 UpdateEndCapsTexture();
-                this.UpdateShape(true);
+                //this.UpdateShape(true);
                 previousEndCap = endCap;
+                ForceNextUpdate();
             }
 
         }
 
-        public void UpdateEndCapsTexture()
+        protected void ApplyEndcapToMaterial(Material material, EndCapProfile endCap)
+        {
+            if(material == null || endCap == null)
+            {
+                Debug.LogError("Can not apply end cap to material");
+                return;
+            }
+
+            Texture[] textures = Resources.FindObjectsOfTypeAll(typeof(Texture)) as Texture[];
+
+            Texture tex = string.IsNullOrEmpty(endCap.texture) ? null : textures.FirstOrDefault(x => x.name == endCap.texture);
+            Texture bump = string.IsNullOrEmpty(endCap.bump) ? null : textures.FirstOrDefault(x => x.name == endCap.bump);
+
+            // Set shaders
+            if (!part.Modules.Contains("ModulePaintable"))
+            {
+                Shader newShader = Shader.Find(bump != null ? "KSP/Bumped Specular" : "KSP/Specular");
+
+                //Debug.Log("new shader: " + newShader.name);
+                if (newShader != null)
+                    material.shader = newShader;
+                else
+                {
+                    Debug.LogError("Could not find shader for top");
+                    return;
+                }
+
+            }
+
+            if (null != tex)
+                material.SetTexture("_MainTex", tex);
+
+
+            if (null != bump)
+                material.SetTexture("_BumpMap", bump);
+            
+
+            material.SetColor("_SpecColor", endCap.specular);
+            material.SetFloat("_Shininess", endCap.shininess);
+            material.SetTextureScale("_MainTex", endCap.textureScale);
+            material.SetTextureScale("_BumpMap", endCap.textureScale);
+            
+            //Debug.Log("scale: " + selectedEndCaps.topCap.textureScale);
+
+            Vector2 topOffset = new Vector2((1f / endCap.textureScale.x - 1f) / 2f,
+                                                (1f / endCap.textureScale.y - 1f) / 2f);
+
+
+            material.SetTextureOffset("_MainTex", topOffset);
+
+            material.SetTextureOffset("_BumpMap", topOffset);
+
+        }
+
+        protected void ApplyDefaultEndCapToMaterial(Material material)
+        {
+            ProceduralPart.TextureSet textureSet = PPart.TextureSets.FirstOrDefault(set => set.name == PPart.textureSet);
+
+            if (textureSet != null)
+            {
+                Texture tex = textureSet.ends;
+                Texture bump = null;
+
+                // Set shaders
+                if (!part.Modules.Contains("ModulePaintable"))
+                {
+                    Shader newShader = Shader.Find("KSP/Diffuse");
+                    if (newShader != null)
+                        material.shader = newShader;
+                    else
+                        Debug.LogError("Could not find shader");
+                }
+
+                if(tex != null)
+                    material.SetTexture("_MainTex", tex);
+
+                if (bump != null)
+                    material.SetTexture("_BumpMap", bump);
+
+                if (material != null)
+                {
+                    const float scale = 0.93f;
+                    const float offset = (1f / scale - 1f) / 2f;
+                    material.mainTextureScale = new Vector2(scale, scale);
+                    material.mainTextureOffset = new Vector2(offset, offset);
+                }
+            }
+
+        }
+
+        public override void UpdateEndCapsTexture()
         {
             Debug.Log("Update end caps tex");
             Material EndsMaterialTop;
@@ -1712,86 +1803,129 @@ namespace ProceduralParts
                 EndsMaterialBottom = PPart.EndsMaterialBottom;
             }
 
-            Texture[] textures = Resources.FindObjectsOfTypeAll(typeof(Texture)) as Texture[];
+            //Texture[] textures = Resources.FindObjectsOfTypeAll(typeof(Texture)) as Texture[];
             
-            Texture texTop = null;
-            Texture texBottom = null;
+            //Texture texTop = null;
+            //Texture texBottom = null;
             
-            Texture bumpTop = null;
-            Texture bumpBottom = null;
+            //Texture bumpTop = null;
+            //Texture bumpBottom = null;
 
-            if (selectedEndCaps != null)
+            if(selectedEndCaps == null || selectedEndCaps.topCap == null)
             {
-                texTop = textures.FirstOrDefault(x => x.name == selectedEndCaps.topCap.texture);
-                texBottom = textures.FirstOrDefault(x => x.name == selectedEndCaps.bottomCap.texture);
+                // Set default texture from TextureSet
 
-                bumpTop = textures.FirstOrDefault(x => x.name == selectedEndCaps.topCap.bump);
-                bumpBottom = textures.FirstOrDefault(x => x.name == selectedEndCaps.bottomCap.bump);
+                ApplyDefaultEndCapToMaterial(EndsMaterialTop);
             }
             else
             {
-                ProceduralPart.TextureSet textureSet = PPart.TextureSets.FirstOrDefault(set => set.name == PPart.textureSet);
-
-                if(textureSet != null)
-                {
-                    texTop = textureSet.ends;
-                    texBottom = textureSet.ends;
-                    bumpTop = null;
-                    bumpBottom = null;
-                }
+                // Create a custom cap
+                ApplyEndcapToMaterial(EndsMaterialTop, selectedEndCaps.topCap);            
             }
 
-            // Set shaders
-            if (!part.Modules.Contains("ModulePaintable"))
+            if (selectedEndCaps == null || selectedEndCaps.bottomCap == null)
             {
-                Shader newShaderTop = Shader.Find(bumpTop != null ? "KSP/Bumped Specular" : "KSP/Specular");
-                Shader newShaderBottom = Shader.Find(bumpBottom != null ? "KSP/Bumped Specular" : "KSP/Specular");
+                // Set default texture from TextureSet
 
-                //Debug.Log("new shader: " + newShader.name);
-                if (newShaderTop != null)
-                    EndsMaterialTop.shader = newShaderTop;
-                else
-                {
-                    Debug.LogError("Could not find shader for top");
-                }
-
-                if (newShaderBottom != null)
-                    EndsMaterialBottom.shader = newShaderBottom;
-                else
-                {
-                    Debug.LogError("Could not find shader for top");
-                }
+                ApplyDefaultEndCapToMaterial(EndsMaterialBottom);
+            }
+            else
+            {
+                // Create a custom cap
+                ApplyEndcapToMaterial(EndsMaterialBottom, selectedEndCaps.bottomCap);
             }
 
-            if (null != texTop)
-                EndsMaterialTop.SetTexture("_MainTex", texTop);
-            else
-                Debug.Log("Could not find texture: " + selectedEndCaps.topCap.texture);
 
-            if (null != texBottom)
-                EndsMaterialTop.SetTexture("_MainTex", texBottom);
-            else
-                Debug.Log("Could not find texture: " + selectedEndCaps.bottomCap.texture);
+            ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-            if (null != bumpTop)
-                EndsMaterialTop.SetTexture("_BumpMap", bumpTop);
-            else
-                Debug.Log("Could not find bump tex: " + selectedEndCaps.topCap.bump);
+            //if (selectedEndCaps != null)
+            //{
+            //    texTop = textures.FirstOrDefault(x => x.name == selectedEndCaps.topCap.texture);
+            //    texBottom = textures.FirstOrDefault(x => x.name == selectedEndCaps.bottomCap.texture);
 
-            if (null != bumpBottom)
-                EndsMaterialTop.SetTexture("_BumpMap", bumpBottom);
-            else
-                Debug.Log("Could not find bump tex: " + selectedEndCaps.bottomCap.bump);
+            //    bumpTop = textures.FirstOrDefault(x => x.name == selectedEndCaps.topCap.bump);
+            //    bumpBottom = textures.FirstOrDefault(x => x.name == selectedEndCaps.bottomCap.bump);
+            //}
+            //else
+            //{
+            //    ProceduralPart.TextureSet textureSet = PPart.TextureSets.FirstOrDefault(set => set.name == PPart.textureSet);
 
-            EndsMaterialTop.SetColor("_SpecColor", selectedEndCaps.topCap.specular);
-            EndsMaterialBottom.SetColor("_SpecColor", selectedEndCaps.bottomCap.specular);
+            //    if(textureSet != null)
+            //    {
+            //        texTop = textureSet.ends;
+            //        texBottom = textureSet.ends;
+            //        bumpTop = null;
+            //        bumpBottom = null;
+            //    }
+            //}
+
+            //// Set shaders
+            //if (!part.Modules.Contains("ModulePaintable"))
+            //{
+            //    Shader newShaderTop = Shader.Find(bumpTop != null ? "KSP/Bumped Specular" : "KSP/Specular");
+            //    Shader newShaderBottom = Shader.Find(bumpBottom != null ? "KSP/Bumped Specular" : "KSP/Specular");
+
+            //    //Debug.Log("new shader: " + newShader.name);
+            //    if (newShaderTop != null)
+            //        EndsMaterialTop.shader = newShaderTop;
+            //    else
+            //    {
+            //        Debug.LogError("Could not find shader for top");
+            //    }
+
+            //    if (newShaderBottom != null)
+            //        EndsMaterialBottom.shader = newShaderBottom;
+            //    else
+            //    {
+            //        Debug.LogError("Could not find shader for top");
+            //    }
+            //}
+
+            //if (null != texTop)
+            //    EndsMaterialTop.SetTexture("_MainTex", texTop);
+            //else
+            //    Debug.Log("Could not find texture: " + selectedEndCaps.topCap.texture);
+
+            //if (null != texBottom)
+            //    EndsMaterialTop.SetTexture("_MainTex", texBottom);
+            //else
+            //    Debug.Log("Could not find texture: " + selectedEndCaps.bottomCap.texture);
+
+            //if (null != bumpTop)
+            //    EndsMaterialTop.SetTexture("_BumpMap", bumpTop);
+            //else
+            //    Debug.Log("Could not find bump tex: " + selectedEndCaps.topCap.bump);
+
+            //if (null != bumpBottom)
+            //    EndsMaterialTop.SetTexture("_BumpMap", bumpBottom);
+            //else
+            //    Debug.Log("Could not find bump tex: " + selectedEndCaps.bottomCap.bump);
+
+            //EndsMaterialTop.SetColor("_SpecColor", selectedEndCaps.topCap.specular);
+            //EndsMaterialBottom.SetColor("_SpecColor", selectedEndCaps.bottomCap.specular);
             
-            EndsMaterialTop.SetFloat("_Shininess", selectedEndCaps.topCap.shininess);
-            EndsMaterialBottom.SetFloat("_Shininess", selectedEndCaps.bottomCap.shininess);
+            //EndsMaterialTop.SetFloat("_Shininess", selectedEndCaps.topCap.shininess);
+            //EndsMaterialBottom.SetFloat("_Shininess", selectedEndCaps.bottomCap.shininess);
 
-            EndsMaterialTop.SetTextureScale("_MainTex", selectedEndCaps.topCap.textureScale);
-            EndsMaterialBottom.SetTextureScale("_MainTex", selectedEndCaps.bottomCap.textureScale);
-            Debug.Log("scale: " + selectedEndCaps.topCap.textureScale);
+            //EndsMaterialTop.SetTextureScale("_MainTex", selectedEndCaps.topCap.textureScale);
+            //EndsMaterialBottom.SetTextureScale("_MainTex", selectedEndCaps.bottomCap.textureScale);
+
+            //EndsMaterialTop.SetTextureScale("_BumpMap", selectedEndCaps.topCap.textureScale);
+            //EndsMaterialBottom.SetTextureScale("_BumpMap", selectedEndCaps.bottomCap.textureScale);
+
+            //Debug.Log("scale: " + selectedEndCaps.topCap.textureScale);
+
+            //Vector2 topOffset = new Vector2((1f / selectedEndCaps.topCap.textureScale.x - 1f) / 2f,
+            //                                    (1f / selectedEndCaps.topCap.textureScale.y - 1f) / 2f);
+
+            //Vector2 bottomOffset = new Vector2((1f / selectedEndCaps.bottomCap.textureScale.x - 1f) / 2f,
+            //                                    (1f / selectedEndCaps.bottomCap.textureScale.y - 1f) / 2f);
+
+            //EndsMaterialTop.SetTextureOffset("_MainTex", topOffset);
+            //EndsMaterialBottom.SetTextureOffset("_MainTex", bottomOffset);
+
+            //EndsMaterialTop.SetTextureOffset("_BumpMap", topOffset);
+            //EndsMaterialBottom.SetTextureOffset("_BumpMap", bottomOffset);
             
             
             //EndsMaterial.SetTexture("_MainTex", tex.ends);
