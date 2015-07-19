@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using KSPAPIExtensions;
+using KSPAPIExtensions.PartMessage;
 
 namespace ProceduralParts
 {
@@ -49,8 +50,48 @@ namespace ProceduralParts
         public override void OnStart(StartState state)
         {
             Debug.LogWarning("OnStart Shape " + displayName);
-            
+
             base.OnStart(state);
+
+            foreach(AttachNode attachNode in part.attachNodes)
+            {
+                AttachmentNode newNode;
+
+                newNode.Node = attachNode;
+                newNode.Position = new ShapeCoordinates();
+
+                if (attachNode.id == topNodeName)
+                {
+                    // standard top node
+                    
+                    newNode.Position.r = 0;
+                    newNode.Position.u = 0;
+                    newNode.Position.y = 1;
+                    newNode.Position.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+                    newNode.Position.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS;                  
+                }
+                else if (attachNode.id == bottomNodeName)
+                {
+                    // standard bottom node
+
+                    newNode.Position.r = 0;
+                    newNode.Position.u = 0;
+                    newNode.Position.y = -1;
+                    newNode.Position.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+                    newNode.Position.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS;
+                }
+                else
+                {
+                    newNode.Position.r = attachNode.position.x;
+                    newNode.Position.u = attachNode.position.z;
+                    newNode.Position.y = attachNode.position.y;
+                    newNode.Position.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+                    newNode.Position.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS;
+                }
+                attachmentNodes.Add(newNode);
+            }
+            
+            
             
             if (endCapsSerialized != null)
             {
@@ -95,10 +136,21 @@ namespace ProceduralParts
 
         #region attachments
 
+        protected class SoRShapeAttachment : ShapeAttachment
+        {
+            public override ShapeCoordinates updateCoordinates()
+            {
+                throw new NotImplementedException();
+            }
+            
+            
+        }
+
         public override Vector3 FromCylindricCoordinates(ShapeCoordinates coords)
         {
             Vector3 position = new Vector3();
 
+            AttachNode node = null;
             switch (coords.HeightMode)
             {
                 case ShapeCoordinates.YMode.RELATIVE_TO_SHAPE:
@@ -116,6 +168,23 @@ namespace ProceduralParts
 
                 case ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_TOP:
                     position.y = coords.y + lastProfile.Last.Value.y;
+                    break;
+
+                case ShapeCoordinates.YMode.RELATIVE_TO_TOP_NODE:
+                    node = part.findAttachNode(topNodeName);
+                    position.y = node.position.y * coords.y;
+                    break;
+                case ShapeCoordinates.YMode.RELATIVE_TO_BOTTOM_NODE:
+                    node = part.findAttachNode(bottomNodeName);
+                    position.y = node.position.y * coords.y;
+                    break;
+                case ShapeCoordinates.YMode.OFFSET_FROM_TOP_NODE:
+                    node = part.findAttachNode(topNodeName);
+                    position.y = node.position.y + coords.y;
+                    break;
+                case ShapeCoordinates.YMode.OFFSET_FROM_BOTTOM_NODE:
+                    node = part.findAttachNode(bottomNodeName);
+                    position.y = node.position.y + coords.y;
                     break;
                 default:
                     Debug.LogError("Can not handle PartCoordinate attribute: " + coords.HeightMode);
@@ -185,45 +254,6 @@ namespace ProceduralParts
                     break;
             }
 
-            /*
-            radius = coords.r;
-
-            if (coords.RadiusMode != ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_CENTER)
-            {
-                if (position.y <= lastProfile.First.Value.y)
-                    radius = coords.RadiusMode == ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS ?
-                        lastProfile.First.Value.dia / 2.0f + coords.r :
-                        radius = lastProfile.First.Value.dia / 2.0f * coords.r;
-
-                else if (position.y >= lastProfile.Last.Value.y)
-                    radius = coords.RadiusMode == ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS ?
-                        lastProfile.Last.Value.dia / 2.0f + coords.r :
-                        radius = lastProfile.Last.Value.dia / 2.0f * coords.r;
-                else
-                {
-                    ProfilePoint pt = lastProfile.First.Value;
-                    for (LinkedListNode<ProfilePoint> ptNode = lastProfile.First.Next; ptNode != null; ptNode = ptNode.Next)
-                    {
-                        if (!ptNode.Value.inCollider)
-                            continue;
-                        ProfilePoint pv = pt;
-                        pt = ptNode.Value;
-
-                        if (position.y >= Mathf.Min(pv.y, pt.y) && position.y < Mathf.Max(pv.y, pt.y))
-                        {
-                            float t = Mathf.InverseLerp(Mathf.Min(pv.y, pt.y), Mathf.Max(pv.y, pt.y), position.y);
-                            float profileRadius = Mathf.Lerp(pv.dia, pt.dia, t) / 2.0f;
-
-                            
-                            radius = coords.RadiusMode == ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS ? 
-                                profileRadius + coords.r :
-                                radius = profileRadius * coords.r;
-                        }
-                    }
-                }
-            }
-
-            */
             float theta = Mathf.Lerp(0, Mathf.PI * 2f, coords.u);
 
             position.x = Mathf.Cos(theta) * radius;
@@ -233,10 +263,18 @@ namespace ProceduralParts
             
         }
 
+        public void GetCylindricCoordinates(Transform transform, ShapeCoordinates result)
+        {
+            //Vector3 position = this.transform.TransformPoint(transform.position);
+
+            GetCylindricCoordinates(gameObject.transform.InverseTransformPoint(transform.position), result);
+        }
+
         public override void GetCylindricCoordinates(Vector3 position, ShapeCoordinates result)
         {
 
             Vector2 direction = new Vector2(position.x, position.z);
+            AttachNode node = null;
 
             switch(result.HeightMode)
             {
@@ -255,6 +293,24 @@ namespace ProceduralParts
 
                 case ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_TOP:
                     result.y = position.y - lastProfile.Last.Value.y;
+                    break;
+
+                case ShapeCoordinates.YMode.RELATIVE_TO_TOP_NODE:
+                    node = part.findAttachNode(topNodeName);
+                    result.y = position.y / node.position.y;
+                    break;
+
+                case ShapeCoordinates.YMode.RELATIVE_TO_BOTTOM_NODE:
+                    node = part.findAttachNode(bottomNodeName);
+                    result.y = position.y / node.position.y;
+                    break;
+                case ShapeCoordinates.YMode.OFFSET_FROM_TOP_NODE:
+                    node = part.findAttachNode(topNodeName);
+                    result.y = position.y - node.position.y;
+                    break;
+                case ShapeCoordinates.YMode.OFFSET_FROM_BOTTOM_NODE:
+                    node = part.findAttachNode(bottomNodeName);
+                    result.y = position.y - node.position.y;
                     break;
                 default:
                     Debug.LogError("Can not handle PartCoordinate attribute: " + result.HeightMode);
@@ -313,6 +369,56 @@ namespace ProceduralParts
                 result.r = 0;
             }
         }
+
+
+        #region shape attachments
+
+        //protected class ShapeAttachment
+        //{
+        //    public TransformFollower follower;
+        //    public ShapeCoordinates coordinates;
+        //}
+        protected LinkedList<SoRShapeAttachment> shapeAttachments = new LinkedList<SoRShapeAttachment>();
+
+        public override ShapeAttachment AddAttachment(TransformFollower follower, ShapeCoordinates coordinates, bool updateCoordinates = false)
+        {
+            if (follower == null)
+                throw new ArgumentNullException("follower");
+            if (coordinates == null)
+                throw new ArgumentNullException("coordinates");
+
+            if(updateCoordinates)
+            {
+                GetCylindricCoordinates(follower.transform, coordinates);
+            }
+
+            SoRShapeAttachment newAttachment = new SoRShapeAttachment();
+
+            newAttachment.coordinates = coordinates;
+            newAttachment.follower = follower;
+
+            shapeAttachments.AddLast(newAttachment);
+
+            return newAttachment;
+        }
+
+        public override void RemoveAttachment(ShapeAttachment attachment, bool updateCoordinates = false)
+        {
+            SoRShapeAttachment sorAttachment = attachment as SoRShapeAttachment;
+
+            if (sorAttachment != null)
+            {
+                shapeAttachments.Remove(sorAttachment);
+
+                if(updateCoordinates)
+                {
+                    GetCylindricCoordinates(sorAttachment.follower.transform, sorAttachment.coordinates);
+                }
+
+            }
+        }
+
+        #endregion
 
         private enum Location
         {
@@ -512,7 +618,7 @@ namespace ProceduralParts
 
         private void MoveAttachments(LinkedList<ProfilePoint> pts)
         {
-            lastProfile = pts;
+            //lastProfile = pts; // moved to WriteMeshes()
 
             // top points
             ProfilePoint top = pts.Last.Value;
@@ -731,8 +837,14 @@ namespace ProceduralParts
             UpdateNodeSize(pts.First(), bottomNodeName);
             UpdateNodeSize(pts.Last(), topNodeName);
 
+            lastProfile = pts;
+
+            MoveAttachNodes(selectedEndCaps);
+
             // Move attachments first, before subdividing
             MoveAttachments(pts);
+
+            
 
             // Horizontal profile point subdivision
             SubdivHorizontal(pts);
@@ -907,6 +1019,7 @@ namespace ProceduralParts
                     {
                         Debug.Log("Create custom top cap");
                         top = CreateEndCapFromProfile(true, pts, selectedEndCaps.topCap, selectedEndCaps.topCap.invertFaces);
+                        //MoveAttachNodes(selectedEndCaps.topCap, true);
                     }
                     else
                     {
@@ -929,6 +1042,7 @@ namespace ProceduralParts
                     {
                         Debug.Log("Create custom bottom cap");
                         bottom = CreateEndCapFromProfile(false, pts, selectedEndCaps.bottomCap, selectedEndCaps.bottomCap.invertFaces);
+                        //MoveAttachNodes(selectedEndCaps.bottomCap, false);
                     }
                     else
                     {
@@ -1127,7 +1241,200 @@ namespace ProceduralParts
             RaiseChangeTextureScale(nodeName, PPart.EndsMaterialTop, new Vector2(pt.dia, pt.dia));
         }
 
-       
+        
+
+        protected void MoveAttachNodes(EndCaps caps)
+        {
+
+            foreach (AttachmentNode attachmentNode in attachmentNodes)
+            {
+                ShapeCoordinates nodePosition = attachmentNode.Position;
+                
+                if(selectedEndCaps != null && selectedEndCaps.AttachNodes != null)
+                {
+                    
+                    EndCaps.AttachNodePosition overridePosition =
+                                selectedEndCaps.AttachNodes.FirstOrDefault(x => x.id == attachmentNode.Node.id);
+
+
+                    if (overridePosition != null)
+                    {
+                        if (overridePosition.Coordinates == null)
+                        {
+                            // create new override coordinates
+
+                            ShapeCoordinates newOverride = new ShapeCoordinates();
+                            newOverride.r = overridePosition.r;
+                            newOverride.u = overridePosition.u;
+                            newOverride.y = overridePosition.y;
+                            newOverride.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_SHAPE_RADIUS;
+
+                            switch(overridePosition.HeightMode)
+                            {
+                                case EndCaps.AttachNodePosition.YMode.RELATIVE:
+                                    newOverride.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+                                    break;
+
+                                case EndCaps.AttachNodePosition.YMode.OFFSET:
+                                    newOverride.HeightMode = ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_CENTER;
+                                    break;
+
+                                case EndCaps.AttachNodePosition.YMode.OFFSET_FROM_TOP:
+                                    newOverride.HeightMode = ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_TOP;
+                                    break;
+                                case EndCaps.AttachNodePosition.YMode.OFFSET_FROM_BOTTOM:
+                                    newOverride.HeightMode = ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_BOTTOM;
+                                    break;
+                            }
+
+                            overridePosition.Coordinates = newOverride;
+                            nodePosition = newOverride;
+                        }
+                        else
+                            nodePosition = overridePosition.Coordinates;
+                    }
+
+                }
+
+                attachmentNode.Node.position = attachmentNode.Node.originalPosition = FromCylindricCoordinates(nodePosition);
+                AttachNodeChanged(attachmentNode.Node);
+
+            }
+
+            //foreach(AttachNode attachNode in part.attachNodes)
+            //{
+            //    EndCaps.AttachNodePosition nodePosition = null;
+            //    if(caps != null && (nodePosition = caps.AttachNodes.FirstOrDefault( x => x.id == attachNode.id)) != null)
+            //    {
+            //        // custom cap node
+            //        ShapeCoordinates coords = new ShapeCoordinates();
+            //        coords.r = nodePosition.r;
+            //        coords.u = nodePosition.u;
+            //        coords.y = nodePosition.y;
+            //        coords.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+            //        coords.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS;
+
+            //        attachNode.originalPosition = attachNode.position = FromCylindricCoordinates(coords);
+            //        AttachNodeChanged(attachNode);
+            //    }
+            //    else
+            //    {
+            //        if(attachNode.id == topNodeName)
+            //        {
+            //            // standard top node
+            //            ShapeCoordinates coords = new ShapeCoordinates();
+            //            coords.r = 0;
+            //            coords.u = 0;
+            //            coords.y = 1;
+            //            coords.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+            //            coords.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS;
+
+            //            attachNode.originalPosition = attachNode.position = FromCylindricCoordinates(coords);
+            //            AttachNodeChanged(attachNode);
+            //        }
+
+            //        if (attachNode.id == bottomNodeName)
+            //        {
+            //            // standard bottom node
+            //            ShapeCoordinates coords = new ShapeCoordinates();
+            //            coords.r = 0;
+            //            coords.u = 0;
+            //            coords.y = -1;
+            //            coords.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+            //            coords.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_BOTTOM_RADIUS;
+
+            //            attachNode.originalPosition = attachNode.position = FromCylindricCoordinates(coords);
+            //            AttachNodeChanged(attachNode);
+            //        }
+
+                    
+            //    }
+            //}
+
+
+            
+            //if(profile == null)
+            //{
+            //    Debug.LogError("profile == null");
+            //    return;
+            //}
+            
+            //if (part != null && part.attachNodes != null && profile.AttachNodes != null)
+            //{
+            //    foreach (EndCapProfile.AttachNodePosition nodePosition in profile.AttachNodes)
+            //    {
+                    
+            //        if (String.IsNullOrEmpty(nodePosition.id))
+            //        {
+            //            Debug.LogError("invalid id");
+            //            break;
+            //        }
+                   
+            //        Debug.Log(nodePosition.ToString());
+                    
+            //        //AttachNode node = part.attachNodes.FirstOrDefault(n => n.id == nodePosition.id);
+            //        AttachNode node = part.findAttachNode(top ? topNodeName : bottomNodeName);
+                    
+            //        if (node != null)
+            //        {
+            //            //Debug.Log("found node: " + node.id);
+            //            ShapeCoordinates coords = new ShapeCoordinates();
+
+            //            coords.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+            //            coords.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_SHAPE_RADIUS;
+            //            coords.r = nodePosition.r;
+            //            coords.y = top ? nodePosition.y : -nodePosition.y;
+            //            coords.u = nodePosition.u;
+
+            //            Vector3 newPosition = FromCylindricCoordinates(coords);
+
+                        
+            //            Debug.Log("New position: " + newPosition);
+
+            //            Debug.Log("position: " + node.position);
+            //            Debug.Log("orig position: " + node.originalPosition);
+
+            //            Debug.Log("orientation: " + node.orientation);
+            //            Debug.Log("original orientation: " + node.originalOrientation);
+
+            //            node.position = newPosition;
+
+            //            node.originalPosition = node.position;
+
+            //            try
+            //            {
+            //                if (GameSceneFilter.AnyEditorOrFlight.IsLoaded())
+            //                {
+            //                    if (node == null)
+            //                        Debug.Log("node == null");
+            //                    else
+            //                    {
+            //                        AttachNodeChanged(node);
+                                    
+            //                    }
+            //                }
+            //            }
+            //            catch(Exception e)
+            //            {
+            //                Debug.LogError("Error while sending Node pos change msg");
+            //                Debug.LogException(e);
+                            
+            //            }
+                        
+            //        }
+            //        else
+            //        {
+            //            Debug.LogWarning("Could not find node: " + nodePosition.id);
+            //        }
+            //    }
+                
+            //}
+            //else
+            //{
+            //    Debug.LogWarning("part or caps Attach node list is null");
+            //}
+            
+        }
 
         protected UncheckedMesh CreateEndCapFromProfile(bool top, LinkedList<ProfilePoint> pts, EndCapProfile profile, bool invertFaces = false)
         {
@@ -1930,6 +2237,18 @@ namespace ProceduralParts
             
             //EndsMaterial.SetTexture("_MainTex", tex.ends);
             
+        }
+
+        #endregion
+
+        #region Attachment Nodes
+
+        protected List<AttachmentNode> attachmentNodes = new List<AttachmentNode>();
+
+        protected struct AttachmentNode
+        {
+            public AttachNode Node;
+            public ShapeCoordinates Position;
         }
 
         #endregion

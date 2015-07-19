@@ -10,6 +10,7 @@ namespace ProceduralParts
     {
         public override void OnAwake()
         {
+            Debug.LogWarning("AbstractShape OnAwake");
             base.OnAwake();
             PartMessageService.Register(this);
             //this.RegisterOnUpdateEditor(OnUpdateEditor);
@@ -110,6 +111,14 @@ namespace ProceduralParts
         [PartMessageEvent]
         public event PartColliderChanged ColliderChanged;
 
+        [PartMessageEvent]
+        public event PartAttachNodePositionChanged NodePositionChanged;
+
+        protected void AttachNodeChanged(AttachNode node)
+        {
+            NodePositionChanged(node, node.position, node.orientation, node.secondaryAxis);
+        }
+
         protected void RaiseChangeTextureScale(string meshName, Material material, Vector2 targetScale)
         {
             ChangeTextureScale(meshName, material, targetScale);
@@ -206,6 +215,15 @@ namespace ProceduralParts
 
         #region Attachments
 
+        public abstract class ShapeAttachment
+        {      
+            public ShapeCoordinates coordinates;
+            public TransformFollower follower;
+
+            public abstract ShapeCoordinates updateCoordinates();
+
+        }
+
         /// <summary>
         /// Add object attached to the surface of this part.
         /// Base classes should proportionally move the location and orientation (rotation) as the part stretches.
@@ -216,6 +234,9 @@ namespace ProceduralParts
         /// - where i would be in space on a unit length and diameter cylinder. This method will relocate the object.</param>
         /// <returns>Object used to track the attachment for Remove method</returns>
         public abstract object AddAttachment(TransformFollower attach, bool normalized);
+
+        public abstract ShapeAttachment AddAttachment(TransformFollower attach, ShapeCoordinates coordinates, bool updateCoordinates = false);
+        public abstract void RemoveAttachment(ShapeAttachment attachment, bool updateCoordinates = false);
 
         /// <summary>
         /// Remove object attached to the surface of this part.
@@ -243,7 +264,11 @@ namespace ProceduralParts
                 OFFSET_FROM_SHAPE_CENTER,
                 OFFSET_FROM_SHAPE_TOP,
                 OFFSET_FROM_SHAPE_BOTTOM,
-                RELATIVE_TO_SHAPE
+                RELATIVE_TO_SHAPE,
+                RELATIVE_TO_TOP_NODE,
+                RELATIVE_TO_BOTTOM_NODE,
+                OFFSET_FROM_TOP_NODE,
+                OFFSET_FROM_BOTTOM_NODE
             }
 
             public RMode RadiusMode = RMode.OFFSET_FROM_SHAPE_RADIUS;

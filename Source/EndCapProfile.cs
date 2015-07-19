@@ -134,6 +134,8 @@ namespace ProceduralParts
             OFFSET_TO_SHAPE_RADIUS
         }
 
+        
+
         [Serializable]
         public struct EndCapProfilePoint
         {
@@ -204,6 +206,7 @@ namespace ProceduralParts
 
         
         public List<EndCapProfilePoint> ProfilePoints = new List<EndCapProfilePoint>();
+        
 
         public void Load(ConfigNode node)
         {
@@ -215,6 +218,8 @@ namespace ProceduralParts
                 ProfilePoints.Add(newPoint);
                 //Debug.LogWarning("Loaded key: " + newPoint);
             }
+
+            
 
             if(node.HasValue("specular"))
               specular = ConfigNode.ParseColor(node.GetValue("specular"));
@@ -237,7 +242,9 @@ namespace ProceduralParts
                 }
 
             }
-            //Debug.LogWarning("texture scale: " + textureScale);
+
+
+            
         }
 
         public void Save(ConfigNode node)
@@ -246,9 +253,13 @@ namespace ProceduralParts
             {
                 node.AddValue("key", pp.ToString());
                 //Debug.LogWarning("Saved key: " + pp.ToString());
-                node.AddValue("textureScale", ConfigNode.WriteVector(textureScale));
-                node.AddValue("specular", ConfigNode.WriteColor(specular));
+                
             }
+
+            node.AddValue("textureScale", ConfigNode.WriteVector(textureScale));
+            node.AddValue("specular", ConfigNode.WriteColor(specular));
+
+            
         }
 
         public void OnSerialization()
@@ -280,6 +291,8 @@ namespace ProceduralParts
         public EndCapProfile topCap;
         
         public EndCapProfile bottomCap;
+
+        public List<AttachNodePosition> AttachNodes = new List<AttachNodePosition>();
 
         public void Load(ConfigNode node)
         {
@@ -314,7 +327,16 @@ namespace ProceduralParts
                 }
                 else
                     bottomCap = null;
-            }     
+            }
+
+            string[] nodes = node.GetValues("node");
+
+            foreach (string s in nodes)
+            {
+                AttachNodePosition newPosition = new AttachNodePosition(s);
+                AttachNodes.Add(newPosition);
+                //Debug.LogWarning("Loaded key: " + newPoint);
+            }
         }
 
         public void Save(ConfigNode node)
@@ -345,6 +367,11 @@ namespace ProceduralParts
                 }
 
             }
+
+            foreach (AttachNodePosition nodePosition in AttachNodes)
+            {
+                node.AddValue("node", nodePosition.ToString());
+            }
         }
 
         public void OnSerialization()
@@ -363,6 +390,48 @@ namespace ProceduralParts
 
             if (bottomCap != null)
                 bottomCap.OnDeserialization();
+        }
+
+        [Serializable]
+        public class AttachNodePosition
+        {
+            public enum YMode
+            {
+                RELATIVE,
+                OFFSET,
+                OFFSET_FROM_TOP,
+                OFFSET_FROM_BOTTOM
+            }
+
+            public string id;
+            public float r;
+            public float u;
+            public float y;
+            public EndCapProfile.RMode RadiusMode;
+            public YMode HeightMode;
+            
+            [NonSerialized]
+            public ProceduralAbstractShape.ShapeCoordinates Coordinates;
+
+            public AttachNodePosition(string s)
+            {
+                string[] elements = s.Split(null).Where(x => x != string.Empty).ToArray();
+
+                id = elements[0];
+
+                r = float.Parse(elements[1]);
+                u = float.Parse(elements[2]);
+                y = float.Parse(elements[3]);
+                RadiusMode = (EndCapProfile.RMode)Enum.Parse(typeof(EndCapProfile.RMode), elements[4]);
+                HeightMode = (YMode)Enum.Parse(typeof(YMode), elements[5]);
+            }
+
+            public override string ToString()
+            {
+                string s;
+                s = (!String.IsNullOrEmpty(id) ? id : "-") + " " + r + " " + u + " " + y + " " + RadiusMode + " " + HeightMode;
+                return s;
+            }
         }
     }
 

@@ -942,8 +942,9 @@ namespace ProceduralParts
                 shape.OnUpdateEditor();
             }
 
-            foreach (AttachNode node in part.attachNodes)
-                InitializeNode(node);
+            
+            //foreach (AttachNode node in part.attachNodes)
+            //    InitializeNode(node);
             if (part.attachRules.allowSrfAttach)
                 InitializeNode(part.srfAttachNode);
 
@@ -1095,10 +1096,10 @@ namespace ProceduralParts
                     if(child != null)
                         PartChildAttached(child);
                 }
-                if (transform.parent == null)
-                    PartParentChanged(null);
-                else
-                    PartParentChanged(transform.parent.GetComponent<Part>());
+                //if (transform.parent == null)
+                //    PartParentChanged(null);
+                //else
+                //    PartParentChanged(transform.parent.GetComponent<Part>());
 
                 break;
 
@@ -1130,33 +1131,44 @@ namespace ProceduralParts
         [PartMessageListener(typeof(PartAttachNodePositionChanged), PartRelationship.Child, GameSceneFilter.AnyEditor)]
         public void PartAttachNodePositionChanged(AttachNode node, [UseLatest] Vector3 location, [UseLatest] Vector3 orientation, [UseLatest] Vector3 secondaryAxis)
         {
-            //Debug.LogWarning("PartNode position changed");
-
-            if(node == null)
+            try
             {
-                Debug.LogError("PartAttachNodePositionChanged message received, but node is null.");
-                return;
-            }
+                Debug.LogWarning("PartNode position changed");
 
-            if(node.owner == null)
-            {
-                Debug.LogWarning("PartAttachNodePositionChanged message received, but node.owner is null. Message ignored");
-                return;
-            }
-
-            if (node.owner.GetComponent<ProceduralPart>() == null)
-            {
-                foreach (FreePartAttachment attachment in childAttach)
+                if (node == null)
                 {
-                    if (node == attachment.AttachNode)
-                    {
-                        Vector3 position = node.owner.transform.TransformPoint(node.position);
-                        shape.GetCylindricCoordinates(transform.InverseTransformPoint(position), attachment.Coordinates);
-                    }
+                    Debug.LogError("PartAttachNodePositionChanged message received, but node is null.");
+                    return;
+                }
 
+                if (node.owner == null)
+                {
+                    Debug.LogWarning("PartAttachNodePositionChanged message received, but node.owner is null. Message ignored");
+                    return;
+                }
+
+                if (node.owner.GetComponent<ProceduralPart>() == null)
+                {
+                    foreach (FreePartAttachment attachment in childAttach)
+                    {
+                        if (node == attachment.AttachNode)
+                        {
+                            Vector3 position = node.owner.transform.TransformPoint(node.position);
+                            shape.GetCylindricCoordinates(transform.InverseTransformPoint(position), attachment.Coordinates);
+                        }
+
+                    }
+                }
+                else
+                {
+                    shape.ForceNextUpdate();
                 }
             }
-
+            catch(Exception e)
+            {
+                Debug.LogError("Exception after receiving PartAttachNodePositionChanged msg");
+                Debug.LogException(e);
+            }
         }
 
         [PartMessageListener(typeof(PartChildAttached), scenes: GameSceneFilter.AnyEditor)]
@@ -1214,9 +1226,9 @@ namespace ProceduralParts
                     //Debug.Log("NodeID: " + ourNode.id);
 
                     if (ourNode.id == "top")
-                        newAttachment.Coordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_TOP;
+                        newAttachment.Coordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.OFFSET_FROM_TOP_NODE;
                     else if (ourNode.id == "bottom")
-                        newAttachment.Coordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.OFFSET_FROM_SHAPE_BOTTOM;
+                        newAttachment.Coordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.OFFSET_FROM_BOTTOM_NODE;
                     else
                         newAttachment.Coordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
                     break;
@@ -1263,49 +1275,49 @@ namespace ProceduralParts
             Debug.LogWarning("*ST* Message recieved removing child, but can't find child");
         }
 
-        [PartMessageListener(typeof(PartParentChanged), scenes: GameSceneFilter.AnyEditor)]
-        public void PartParentChanged(Part newParent)
-        {
-            if (shape == null) //OnUpdate hasn't fired yet
-            {
-                toAttach.Enqueue(() => PartParentChanged(newParent));
-                return;
-            }
-            //Debug.Log("PartParentChanged");
-            if (parentAttachment != null)
-            {
-                RemovePartAttachment(parentAttachment);
-                //Debug.LogWarning("Detatching: " + part + " from parent: " + newParent);
-                parentAttachment = null;
-            }
+        //[PartMessageListener(typeof(PartParentChanged), scenes: GameSceneFilter.AnyEditor)]
+        //public void PartParentChanged(Part newParent)
+        //{
+        //    if (shape == null) //OnUpdate hasn't fired yet
+        //    {
+        //        toAttach.Enqueue(() => PartParentChanged(newParent));
+        //        return;
+        //    }
+        //    //Debug.Log("PartParentChanged");
+        //    if (parentAttachment != null)
+        //    {
+        //        RemovePartAttachment(parentAttachment);
+        //        //Debug.LogWarning("Detatching: " + part + " from parent: " + newParent);
+        //        parentAttachment = null;
+        //    }
 
-            if (newParent == null)
-                return;
+        //    if (newParent == null)
+        //        return;
 
-            AttachNode childToParent = part.findAttachNodeByPart(newParent);
-            if (childToParent == null)
-            {
-                Debug.LogError("*ST* unable to find parent node from child: " + part.transform);
-                return;
-            }
-            Vector3 position = transform.TransformPoint(childToParent.position);
+        //    AttachNode childToParent = part.findAttachNodeByPart(newParent);
+        //    if (childToParent == null)
+        //    {
+        //        Debug.LogError("*ST* unable to find parent node from child: " + part.transform);
+        //        return;
+        //    }
+        //    Vector3 position = transform.TransformPoint(childToParent.position);
             
-            // ReSharper disable once InconsistentNaming
-            Func<Vector3> Offset;
-            if (nodeOffsets.TryGetValue(childToParent.id, out Offset))
-                position -= Offset();
+        //    // ReSharper disable once InconsistentNaming
+        //    Func<Vector3> Offset;
+        //    if (nodeOffsets.TryGetValue(childToParent.id, out Offset))
+        //        position -= Offset();
 
-            Part root = EditorLogic.SortedShipList[0];
+        //    Part root = EditorLogic.SortedShipList[0];
 
-            //Debug.LogWarning("Attaching: " + part + " to new parent: " + newParent + " node:" + childToParent.id + " position=" + childToParent.position.ToString("G3"));
+        //    //Debug.LogWarning("Attaching: " + part + " to new parent: " + newParent + " node:" + childToParent.id + " position=" + childToParent.position.ToString("G3"));
 
-             //we need to delta this childAttachment down so that when the translation from the parent reaches here i ends in the right spot
-            parentAttachment = AddPartAttachment(position, new ParentTransformable(root, part, childToParent));
-            parentAttachment.child = newParent;
+        //     //we need to delta this childAttachment down so that when the translation from the parent reaches here i ends in the right spot
+        //    parentAttachment = AddPartAttachment(position, new ParentTransformable(root, part, childToParent));
+        //    parentAttachment.child = newParent;
 
-            // for symetric attachments, seems required. Don't know why.
-            shape.ForceNextUpdate();
-        }
+        //    // for symetric attachments, seems required. Don't know why.
+        //    shape.ForceNextUpdate();
+        //}
 
         private PartAttachment AddPartAttachment(Vector3 position, TransformFollower.Transformable target, bool normalized = false)
         {
