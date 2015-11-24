@@ -130,7 +130,11 @@ namespace ProceduralParts
 
                     UpdateTexture();
 
-                    isEnabled = enabled = false;
+                    if (vessel.rootPart == part) // drag cube re-rendering workaround. See FixedUpdate for more info
+                        dragCubeNeedsRerender = 1;
+                    else
+                        isEnabled = enabled = false; 
+
                 }
 
                 if (HighLogic.LoadedSceneIsEditor)
@@ -1535,7 +1539,7 @@ namespace ProceduralParts
         {
             if (HighLogic.LoadedScene == GameScenes.EDITOR)
             {
-                //Debug.Log("GetModuleCost");
+                //Debug.Log("stdCost: " + stdCost);
                 float cost = baseCost;
                 if ((object)shape != null)
                     cost += shape.GetCurrentCostMult() * shape.Volume * costPerkL;
@@ -1547,21 +1551,45 @@ namespace ProceduralParts
                        cost *= (pm as ICostMultiplier).GetCurrentCostMult();
                     }
                 }
-                float dryCost = cost;
-                float actualCost = cost;
+                float dryCost=0;
+                float actualCost=0;
+                
                 if (!part.Modules.Contains("ModuleFuelTanks") && (object)PartResourceLibrary.Instance != null)
                 {
-                    foreach (PartResource r in part.Resources)
+                    if (!costsIncludeResources)
                     {
-                        PartResourceDefinition d = PartResourceLibrary.Instance.GetDefinition(r.resourceName);
-                        if ((object)d != null)
+                        dryCost = cost;
+                        actualCost = cost;
+                        foreach (PartResource r in part.Resources)
                         {
-                            if (!costsIncludeResources)
+                            PartResourceDefinition d = PartResourceLibrary.Instance.GetDefinition(r.resourceName);
+                            if ((object)d != null)
                             {
                                 cost += (float)(r.maxAmount * d.unitCost);
-                                actualCost += (float)(r.amount * d.unitCost);
+                                actualCost += (float)(r.amount * d.unitCost);      
                             }
-                            else
+                        }
+                    }
+                    else
+                    {
+                        float minimumCosts = 0;
+
+                        foreach (PartResource r in part.Resources)
+                        {
+                            PartResourceDefinition d = PartResourceLibrary.Instance.GetDefinition(r.resourceName);
+                            if ((object)d != null)
+                            {
+                                minimumCosts += (float)(r.maxAmount * d.unitCost);
+                            }
+                        }
+                        cost = Mathf.Max(minimumCosts, cost);
+                        dryCost = cost;
+                        actualCost = cost;
+
+                        foreach (PartResource r in part.Resources)
+                        {
+                            PartResourceDefinition d = PartResourceLibrary.Instance.GetDefinition(r.resourceName);
+                            if ((object)d != null)
                             {
                                 dryCost -= (float)(r.maxAmount * d.unitCost);
                                 actualCost -= (float)((r.maxAmount - r.amount) * d.unitCost);
@@ -1570,6 +1598,7 @@ namespace ProceduralParts
                     }
                 }
                 moduleCost = cost;
+                
                 costDisplay = String.Format("Dry: {0:N0} Wet: {1:N0}", dryCost, actualCost);
             }
             return moduleCost;
@@ -1626,8 +1655,34 @@ namespace ProceduralParts
                 base.part.DragCubes.ClearCubes();
                 base.part.DragCubes.Cubes.Add(dragCube);
                 base.part.DragCubes.ResetCubeWeights();
+                base.part.DragCubes.ForceUpdate(true, true, false);
+                //part.DragCubes.Procedural = true;
             }
 
+        }
+
+        int dragCubeNeedsRerender = 0;
+        public void FixedUpdate()
+        {
+            /* FlightIntegrator resets our dragcube after loading, so we need to rerender it. We cannot do it on the first frame because it would
+                be executed before the reset. Instead we must do it on the second frame.
+            */
+            if (GameSceneFilter.Flight.IsLoaded())
+            {
+                if (dragCubeNeedsRerender > 0)
+                {
+                    --dragCubeNeedsRerender;
+                }
+                else
+                {
+                    //Debug.Log("dragCube needs to re-render");
+                    PartColliderChanged();
+                    dragCubeNeedsRerender = 0;
+
+                    isEnabled = enabled = false; // normally this is done OnStart
+
+                }
+            }
         }
 
     }
