@@ -140,7 +140,8 @@ namespace ProceduralParts
         {
             public override ShapeCoordinates updateCoordinates()
             {
-                throw new NotImplementedException();
+                shape.GetCylindricCoordinates(follower.transform.localPosition, coordinates);
+                    return coordinates;
             }
             
             
@@ -396,6 +397,7 @@ namespace ProceduralParts
 
             newAttachment.coordinates = coordinates;
             newAttachment.follower = follower;
+            newAttachment.shape = this;
 
             shapeAttachments.AddLast(newAttachment);
 
@@ -404,6 +406,7 @@ namespace ProceduralParts
 
         public override void RemoveAttachment(ShapeAttachment attachment, bool updateCoordinates = false)
         {
+            attachment.shape = null;
             SoRShapeAttachment sorAttachment = attachment as SoRShapeAttachment;
 
             if (sorAttachment != null)
@@ -619,6 +622,12 @@ namespace ProceduralParts
         private void MoveAttachments(LinkedList<ProfilePoint> pts)
         {
             //lastProfile = pts; // moved to WriteMeshes()
+
+            foreach(ShapeAttachment a in shapeAttachments)
+            {
+                a.follower.transform.localPosition = FromCylindricCoordinates(a.coordinates);
+                a.follower.ForceUpdate();
+            }
 
             // top points
             ProfilePoint top = pts.Last.Value;
@@ -1050,23 +1059,23 @@ namespace ProceduralParts
                         // TODO no end cap at the bottom
                     }
                 }
-          
-                //if(selectedEndCap.createTop)
-                //    top = CreateEndCapFromProfile(true, pts, selectedEndCap, selectedEndCap.invertFaces);
-               
-               
-                //if(selectedEndCap.createBottom)
-                //    bottom = CreateEndCapFromProfile(false, pts, selectedEndCap,selectedEndCap.invertFaces);
 
-                //if(top != null && bottom != null)
-                //    m = top.Combine(bottom);
-                //else
-                //{
-                //    if (top != null)
-                //        m = top;
-                //    if (bottom != null)
-                //        m = bottom;
-                //}
+            //if(selectedEndCap.createTop)
+            //    top = CreateEndCapFromProfile(true, pts, selectedEndCap, selectedEndCap.invertFaces);
+
+
+            //if(selectedEndCap.createBottom)
+            //    bottom = CreateEndCapFromProfile(false, pts, selectedEndCap,selectedEndCap.invertFaces);
+
+            //if(top != null && bottom != null)
+            //    m = top.Combine(bottom);
+            //else
+            //{
+            //    if (top != null)
+            //        m = top;
+            //    if (bottom != null)
+            //        m = bottom;
+            //}
 
             //}
             //else
@@ -1082,22 +1091,42 @@ namespace ProceduralParts
 
 
 
-                if (HighLogic.LoadedScene == GameScenes.LOADING)
-                {
-                    //m.WriteTo(PPart.EndsIconMesh);
-                    if (top != null)
+
+            if (HighLogic.LoadedScene == GameScenes.LOADING)
+            {
+                //m.WriteTo(PPart.EndsIconMesh);
+
+                if (top != null)
                         top.WriteTo(PPart.EndsIconMeshTop);
-                    if (bottom != null)
-                        bottom.WriteTo(PPart.EndsIconMeshBottom);
+
+                if (bottom != null)
+                    bottom.WriteTo(PPart.EndsIconMeshBottom);
+            }
+            else
+            {
+                if (top != null)
+                {
+                    top.WriteTo(PPart.EndsMeshTop);
+                    PPart.EndsTop.gameObject.SetActive(true);
                 }
                 else
                 {
-                    if (top != null)
-                        top.WriteTo(PPart.EndsMeshTop);
-                    if (bottom != null)
-                        bottom.WriteTo(PPart.EndsMeshBottom);
-                    //m.WriteTo(EndsMesh);
+                    PPart.EndsTop.gameObject.SetActive(false);
                 }
+
+
+                if (bottom != null)
+                {
+                    bottom.WriteTo(PPart.EndsMeshBottom);
+                    PPart.EndsBottom.gameObject.SetActive(true);
+                }
+                else
+                {
+                    PPart.EndsBottom.gameObject.SetActive(false);
+                }
+                
+
+            }
 
             // build the collider mesh at a lower resolution than the visual mesh.
             if (true)//customCollider) // always build a custom collider because the sides mesh does not contain end caps. Which is bad.

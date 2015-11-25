@@ -219,6 +219,9 @@ namespace ProceduralParts
         public Mesh EndsIconMeshTop { get; private set; }
         public Mesh EndsIconMeshBottom { get; private set; }
 
+        public Transform EndsTop { get; private set; }
+        public Transform EndsBottom { get; private set; }
+
         private Transform partModel;
 
         private void InitializeObjects()
@@ -226,8 +229,8 @@ namespace ProceduralParts
             partModel = part.FindModelTransform(partModelName);
             
             Transform sides        = part.FindModelTransform(sidesName);
-            Transform endsTop      = part.FindModelTransform(endsNameTop);
-            Transform endsBottom   = part.FindModelTransform(endsNameBottom);
+            EndsTop      = part.FindModelTransform(endsNameTop);
+            EndsBottom   = part.FindModelTransform(endsNameBottom);
             Transform colliderTr   = part.FindModelTransform(collisionName);
 
             Transform iconModelTransform = part.partInfo.iconPrefab.transform.FindDecendant("model");
@@ -254,8 +257,8 @@ namespace ProceduralParts
 
 
             SidesMaterial = sides.renderer.material;
-            EndsMaterialTop = endsTop.renderer.material;
-            EndsMaterialBottom = endsBottom.renderer.material;
+            EndsMaterialTop = EndsTop.renderer.material;
+            EndsMaterialBottom = EndsBottom.renderer.material;
 
 
             SidesIconMaterial = iconSides.renderer.material;
@@ -268,13 +271,13 @@ namespace ProceduralParts
             else
                 Debug.LogError("could not find sides transform");
 
-            if(endsTop != null)
-                EndsMeshTop = endsTop.GetComponent<MeshFilter>().mesh;
+            if(EndsTop != null)
+                EndsMeshTop = EndsTop.GetComponent<MeshFilter>().mesh;
             else
                 Debug.LogError("could not find top ends transform");
 
-            if(endsBottom != null)
-                EndsMeshBottom = endsBottom.GetComponent<MeshFilter>().mesh;
+            if(EndsBottom != null)
+                EndsMeshBottom = EndsBottom.GetComponent<MeshFilter>().mesh;
             else
                 Debug.LogError("could not find bottom ends transform");
 
@@ -1010,6 +1013,7 @@ namespace ProceduralParts
         {
             private Part child;
             private AttachNode node; // the attachment node of the child (not the one which it is attached to)
+            public ProceduralAbstractShape.ShapeAttachment attachment;
 
             public Part Child
             {
@@ -1116,7 +1120,7 @@ namespace ProceduralParts
                             //ca.node.nodeType
                             //shape.GetCylindricCoordinates(part.transform.localPosition, out ca.u, out ca.y, out ca.r);
                             shape.GetCylindricCoordinates(transform.InverseTransformPoint(position), ca.Coordinates);
-
+                            ca.attachment.updateCoordinates();
                             //Debug.Log("y: " + ca.y);
                             //Debug.Log("u: " + ca.u);
                             //Debug.Log("r: " + ca.r);
@@ -1245,6 +1249,11 @@ namespace ProceduralParts
            
             shape.GetCylindricCoordinates(transform.InverseTransformPoint(position), newAttachment.Coordinates);
             
+            
+
+            TransformFollower.TransformTransformable transformable = new TransformFollower.TransformTransformable(child.transform, node.position);
+            newAttachment.attachment = shape.AddAttachment(TransformFollower.CreateFollower(partModel, position, transformable),newAttachment.Coordinates);
+
             childAttach.AddLast(newAttachment);
 
             //PartAttachment attach = AddPartAttachment(position, new TransformFollower.TransformTransformable(child.transform, node.position));
@@ -1271,7 +1280,7 @@ namespace ProceduralParts
             for (var node = childAttach.First; node != null; node = node.Next)
                 if (node.Value.Child == child)
                 {
-
+                    shape.RemoveAttachment(node.Value.attachment);
                     childAttach.Remove(node);
                     //Debug.LogWarning("Detaching from: " + part + " child: " + child.transform.name);
                     return;
@@ -1279,49 +1288,49 @@ namespace ProceduralParts
             Debug.LogWarning("*ST* Message recieved removing child, but can't find child");
         }
 
-        //[PartMessageListener(typeof(PartParentChanged), scenes: GameSceneFilter.AnyEditor)]
-        //public void PartParentChanged(Part newParent)
-        //{
-        //    if (shape == null) //OnUpdate hasn't fired yet
-        //    {
-        //        toAttach.Enqueue(() => PartParentChanged(newParent));
-        //        return;
-        //    }
-        //    //Debug.Log("PartParentChanged");
-        //    if (parentAttachment != null)
-        //    {
-        //        RemovePartAttachment(parentAttachment);
-        //        //Debug.LogWarning("Detatching: " + part + " from parent: " + newParent);
-        //        parentAttachment = null;
-        //    }
+        [PartMessageListener(typeof(PartParentChanged), scenes: GameSceneFilter.AnyEditor)]
+        public void PartParentChanged(Part newParent)
+        {
+            if (shape == null) //OnUpdate hasn't fired yet
+            {
+                toAttach.Enqueue(() => PartParentChanged(newParent));
+                return;
+            }
+            //Debug.Log("PartParentChanged");
+            if (parentAttachment != null)
+            {
+                RemovePartAttachment(parentAttachment);
+                //Debug.LogWarning("Detatching: " + part + " from parent: " + newParent);
+                parentAttachment = null;
+            }
 
-        //    if (newParent == null)
-        //        return;
+            if (newParent == null)
+                return;
 
-        //    AttachNode childToParent = part.findAttachNodeByPart(newParent);
-        //    if (childToParent == null)
-        //    {
-        //        Debug.LogError("*ST* unable to find parent node from child: " + part.transform);
-        //        return;
-        //    }
-        //    Vector3 position = transform.TransformPoint(childToParent.position);
-            
-        //    // ReSharper disable once InconsistentNaming
-        //    Func<Vector3> Offset;
-        //    if (nodeOffsets.TryGetValue(childToParent.id, out Offset))
-        //        position -= Offset();
+            AttachNode childToParent = part.findAttachNodeByPart(newParent);
+            if (childToParent == null)
+            {
+                Debug.LogError("*ST* unable to find parent node from child: " + part.transform);
+                return;
+            }
+            Vector3 position = transform.TransformPoint(childToParent.position);
 
-        //    Part root = EditorLogic.SortedShipList[0];
+            // ReSharper disable once InconsistentNaming
+            Func<Vector3> Offset;
+            if (nodeOffsets.TryGetValue(childToParent.id, out Offset))
+                position -= Offset();
 
-        //    //Debug.LogWarning("Attaching: " + part + " to new parent: " + newParent + " node:" + childToParent.id + " position=" + childToParent.position.ToString("G3"));
+            Part root = EditorLogic.SortedShipList[0];
 
-        //     //we need to delta this childAttachment down so that when the translation from the parent reaches here i ends in the right spot
-        //    parentAttachment = AddPartAttachment(position, new ParentTransformable(root, part, childToParent));
-        //    parentAttachment.child = newParent;
+            //Debug.LogWarning("Attaching: " + part + " to new parent: " + newParent + " node:" + childToParent.id + " position=" + childToParent.position.ToString("G3"));
 
-        //    // for symetric attachments, seems required. Don't know why.
-        //    shape.ForceNextUpdate();
-        //}
+            //we need to delta this childAttachment down so that when the translation from the parent reaches here i ends in the right spot
+            parentAttachment = AddPartAttachment(position, new ParentTransformable(root, part, childToParent));
+            parentAttachment.child = newParent;
+
+            // for symetric attachments, seems required. Don't know why.
+            shape.ForceNextUpdate();
+        }
 
         private PartAttachment AddPartAttachment(Vector3 position, TransformFollower.Transformable target, bool normalized = false)
         {
@@ -1610,22 +1619,22 @@ namespace ProceduralParts
         public void PartModelChanged()
         {
             //Debug.Log("Shape Changed");
-            foreach (FreePartAttachment ca in childAttach)
-            {
-                Vector3 newPosition = shape.FromCylindricCoordinates(ca.Coordinates);
-                newPosition = transform.TransformPoint(newPosition);
+            //foreach (FreePartAttachment ca in childAttach)
+            //{
+            //    Vector3 newPosition = shape.FromCylindricCoordinates(ca.Coordinates);
+            //    newPosition = transform.TransformPoint(newPosition);
 
-                Vector3 oldPosition = ca.Child.transform.TransformPoint(ca.AttachNode.position);
+            //    Vector3 oldPosition = ca.Child.transform.TransformPoint(ca.AttachNode.position);
 
-                Vector3 offset = newPosition - oldPosition;
+            //    Vector3 offset = newPosition - oldPosition;
 
-                ca.Child.transform.Translate(offset, Space.World);
-                //ca.child.transform.localPosition = shape.FromCylindricCoordinates(ca.u, ca.y, ca.r);// -ca.node.position;
-                //Debug.Log(ca.Child.transform.localPosition);
-                //Debug.Log("u: " + ca.u);
-                //Debug.Log("y: " + ca.y);
-                //Debug.Log("r: " + ca.r);
-            }
+            //    ca.Child.transform.Translate(offset, Space.World);
+            //    //ca.child.transform.localPosition = shape.FromCylindricCoordinates(ca.u, ca.y, ca.r);// -ca.node.position;
+            //    //Debug.Log(ca.Child.transform.localPosition);
+            //    //Debug.Log("u: " + ca.u);
+            //    //Debug.Log("y: " + ca.y);
+            //    //Debug.Log("r: " + ca.r);
+            //}
 
             
             if(partCollider!=null)

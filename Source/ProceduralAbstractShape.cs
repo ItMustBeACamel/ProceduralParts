@@ -10,7 +10,7 @@ namespace ProceduralParts
     {
         public override void OnAwake()
         {
-            Debug.LogWarning("AbstractShape OnAwake");
+            //Debug.LogWarning("AbstractShape OnAwake");
             base.OnAwake();
             PartMessageService.Register(this);
             //this.RegisterOnUpdateEditor(OnUpdateEditor);
@@ -219,6 +219,7 @@ namespace ProceduralParts
         {      
             public ShapeCoordinates coordinates;
             public TransformFollower follower;
+            public ProceduralAbstractShape shape;
 
             public abstract ShapeCoordinates updateCoordinates();
 
