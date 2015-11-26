@@ -222,6 +222,7 @@ namespace ProceduralParts
             public ProceduralAbstractShape shape;
 
             public abstract ShapeCoordinates updateCoordinates();
+            public abstract Vector3 updatePosition();
 
         }
 

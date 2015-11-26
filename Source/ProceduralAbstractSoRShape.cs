@@ -143,8 +143,13 @@ namespace ProceduralParts
                 shape.GetCylindricCoordinates(follower.transform.localPosition, coordinates);
                     return coordinates;
             }
-            
-            
+
+            public override Vector3 updatePosition()
+            {
+                follower.transform.localPosition = shape.FromCylindricCoordinates(coordinates);
+                follower.ForceUpdate();
+                return follower.transform.localPosition;
+            }
         }
 
         public override Vector3 FromCylindricCoordinates(ShapeCoordinates coords)
@@ -959,56 +964,6 @@ namespace ProceduralParts
 
 
             // The endcaps.
-            /*
-            nVrt = first.circ.totVertexes + last.circ.totVertexes;
-            nTri = first.circ.totVertexes - 2 + last.circ.totVertexes - 2;
-            m = new UncheckedMesh(nVrt, nTri);
-
-            first.circ.WriteEndcap(first.dia, first.y, false, 0, 0, m, false);
-            last.circ.WriteEndcap(last.dia, last.y, true, first.circ.totVertexes, (first.circ.totVertexes - 2) * 3, m, !odd);
-            */
-
-            //EndCapProfile testProfile = new EndCapProfile();
-
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.5f, 0.0f, 0.5f, 0.5f));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.7f, 0.1f, 0.7f, 0.7f));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.0f, 0.0f, 1.0f, 1.0f));
-
-            // Stockalike cap
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.65f, 0.95f, 0.6f, EndCapProfile.EdgeMode.Sharp ));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.65f, 1.2f, 0.65f, EndCapProfile.EdgeMode.Sharp ));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.03f, 1.2f, 0.95f, EndCapProfile.EdgeMode.Sharp ));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.03f, 0.97f, 1.0f, EndCapProfile.EdgeMode.Sharp ));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.0f, 0.97f, 1.0f  , EndCapProfile.EdgeMode.Sharp, rmode: EndCapProfile.RMode.RELATIVE_TO_SHAPE_RADIUS));
-
-            // tank dome
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.172f, 0.875f, 0.2f));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.344f, 0.831f, 0.3f));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.950f, 0.636f, 0.6f, EndCapProfile.EdgeMode.Sharp));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(0.950f, 1.000f, 0.7f, EndCapProfile.EdgeMode.Sharp));
-            //testProfile.ProfilePoints.Add(new EndCapProfile.EndCapProfilePoint(1.000f, 1.000f, 1.000f, EndCapProfile.EdgeMode.Sharp));
-            
-            //if (endCaps != null)
-            //{
-            //    if (endCaps.EndCapProfiles != null)
-            //    {
-            //        Debug.Log(endCaps.blubb);
-            //        //part.partInfo.iconPrefab.
-            //        foreach (EndCapProfile p in endCaps.EndCapProfiles)
-            //        {
-            //            Debug.LogWarning("end cap " + p.name);
-            //            foreach (EndCapProfile.EndCapProfilePoint pp in p.ProfilePoints)
-            //            {
-            //                Debug.Log("profile point: " + pp);
-            //            }
-            //        }
-            //    }
-            //    else
-            //        Debug.LogError("end caps profiles == null");
-            //}
-            //else
-            //    Debug.Log("endCaps == null");
-
             UncheckedMesh top = null;
             UncheckedMesh bottom = null;
 
@@ -1097,10 +1052,21 @@ namespace ProceduralParts
                 //m.WriteTo(PPart.EndsIconMesh);
 
                 if (top != null)
-                        top.WriteTo(PPart.EndsIconMeshTop);
+                {
+                    top.WriteTo(PPart.EndsIconMeshTop);
+                    PPart.IconEndsTop.gameObject.SetActive(true);
+                }
+                else
+                    PPart.IconEndsTop.gameObject.SetActive(false);
+                
 
                 if (bottom != null)
+                {
                     bottom.WriteTo(PPart.EndsIconMeshBottom);
+                    PPart.IconEndsBottom.gameObject.SetActive(true);
+                }
+                else
+                    PPart.IconEndsBottom.gameObject.SetActive(false);
             }
             else
             {
@@ -1109,23 +1075,16 @@ namespace ProceduralParts
                     top.WriteTo(PPart.EndsMeshTop);
                     PPart.EndsTop.gameObject.SetActive(true);
                 }
-                else
-                {
+                else 
                     PPart.EndsTop.gameObject.SetActive(false);
-                }
-
-
+                
                 if (bottom != null)
                 {
                     bottom.WriteTo(PPart.EndsMeshBottom);
                     PPart.EndsBottom.gameObject.SetActive(true);
                 }
                 else
-                {
-                    PPart.EndsBottom.gameObject.SetActive(false);
-                }
-                
-
+                    PPart.EndsBottom.gameObject.SetActive(false);                
             }
 
             // build the collider mesh at a lower resolution than the visual mesh.
@@ -1187,10 +1146,10 @@ namespace ProceduralParts
 
                 PPart.ColliderMesh = colliderMesh;
             }
-            else
-            {
-                PPart.ColliderMesh = SidesMesh;
-            }
+            //else
+            //{
+            //    PPart.ColliderMesh = SidesMesh;
+            //}
 
             // updatem all props
             foreach(PartModule pm in GetComponents<PartModule>())

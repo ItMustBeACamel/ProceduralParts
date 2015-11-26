@@ -222,6 +222,9 @@ namespace ProceduralParts
         public Transform EndsTop { get; private set; }
         public Transform EndsBottom { get; private set; }
 
+        public Transform IconEndsTop { get; private set; }
+        public Transform IconEndsBottom { get; private set; }
+
         private Transform partModel;
 
         private void InitializeObjects()
@@ -236,21 +239,21 @@ namespace ProceduralParts
             Transform iconModelTransform = part.partInfo.iconPrefab.transform.FindDecendant("model");
 
             Transform iconSides = iconModelTransform.FindDecendant(sidesName);
-            Transform iconEndsTop = iconModelTransform.FindDecendant(endsNameTop);
-            Transform iconEndsBottom = iconModelTransform.FindDecendant(endsNameBottom);
+            IconEndsTop = iconModelTransform.FindDecendant(endsNameTop);
+            IconEndsBottom = iconModelTransform.FindDecendant(endsNameBottom);
 
             if (iconSides != null)
                 SidesIconMesh = iconSides.GetComponent<MeshFilter>().mesh;
             else
                 Debug.LogError("Could not find icon sides transform");
 
-            if(iconEndsTop != null)
-                EndsIconMeshTop = iconEndsTop.GetComponent<MeshFilter>().mesh;
+            if(IconEndsTop != null)
+                EndsIconMeshTop = IconEndsTop.GetComponent<MeshFilter>().mesh;
             else
                 Debug.LogError("Could not find icon top ends transform");
 
-            if (iconEndsBottom != null)
-                EndsIconMeshBottom = iconEndsBottom.GetComponent<MeshFilter>().mesh;
+            if (IconEndsBottom != null)
+                EndsIconMeshBottom = IconEndsBottom.GetComponent<MeshFilter>().mesh;
             else
                 Debug.LogError("Could not find icon bottom ends transform");
 
@@ -262,8 +265,8 @@ namespace ProceduralParts
 
 
             SidesIconMaterial = iconSides.renderer.material;
-            EndsIconMaterialTop = iconEndsTop.renderer.material;
-            EndsIconMaterialBottom = iconEndsBottom.renderer.material;
+            EndsIconMaterialTop = IconEndsTop.renderer.material;
+            EndsIconMaterialBottom = IconEndsBottom.renderer.material;
 
             // Instantiate meshes. The mesh method unshares any shared meshes.
             if (sides != null)
@@ -1329,7 +1332,7 @@ namespace ProceduralParts
             parentAttachment.child = newParent;
 
             // for symetric attachments, seems required. Don't know why.
-            shape.ForceNextUpdate();
+            //shape.ForceNextUpdate();
         }
 
         private PartAttachment AddPartAttachment(Vector3 position, TransformFollower.Transformable target, bool normalized = false)
@@ -1510,6 +1513,12 @@ namespace ProceduralParts
                 {
                     TransformFollower follower = shape.RemoveAttachment(attach.data, true);
                     attach.data = newShape.AddAttachment(follower, true);
+                }
+
+                foreach(FreePartAttachment a in childAttach)
+                {
+                    shape.RemoveAttachment(a.attachment, true);
+                    a.attachment = newShape.AddAttachment(a.attachment.follower, a.Coordinates);
                 }
             }
 
