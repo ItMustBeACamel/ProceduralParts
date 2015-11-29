@@ -77,9 +77,15 @@ namespace ProceduralParts
 
         [NonSerialized]
         public Vector2 textureScale = new Vector2(0.93f, 0.93f);
-        
+
+        [NonSerialized]
+        public Vector2 textureOffset = new Vector2(0f, 0f);
+
         [Persistent]
         private string textureScaleSerialized;
+
+        [Persistent]
+        private string textureOffsetSerialized;
 
         [Persistent]
         public float shininess = 0.4f;
@@ -243,8 +249,26 @@ namespace ProceduralParts
 
             }
 
+            if (node.HasValue("textureOffset"))
+            {
+                //Vector3 scale;
+                //if (ParseUtils.TryParseVector3(node.GetValue("textureScale"), out scale))
+                //    textureScale = scale.xy2();
 
-            
+                //VectorUtils.TryParse(node.GetValue("textureScale"), ref textureScale);
+                try
+                {
+                    textureOffset = ConfigNode.ParseVector2(node.GetValue("textureOffset"));
+                }
+                catch (Exception)
+                {
+
+                }
+
+            }
+
+
+
         }
 
         public void Save(ConfigNode node)
@@ -257,6 +281,7 @@ namespace ProceduralParts
             }
 
             node.AddValue("textureScale", ConfigNode.WriteVector(textureScale));
+            node.AddValue("textureOffset", ConfigNode.WriteVector(textureOffset));
             node.AddValue("specular", ConfigNode.WriteColor(specular));
 
             
@@ -265,6 +290,7 @@ namespace ProceduralParts
         public void OnSerialization()
         {     
             textureScaleSerialized = ConfigNode.WriteVector(textureScale); //.ToString();
+            textureOffsetSerialized = ConfigNode.WriteVector(textureOffset); //.ToString();
             specularSerialized = specular.ToString();
         }
 
@@ -273,6 +299,10 @@ namespace ProceduralParts
             if (!String.IsNullOrEmpty(textureScaleSerialized))       
                 if (!VectorUtils.TryParse(textureScaleSerialized, ref textureScale))
                     Debug.Log("could not parse textureScale: " + textureScaleSerialized);
+
+            if (!String.IsNullOrEmpty(textureOffsetSerialized))
+                if (!VectorUtils.TryParse(textureOffsetSerialized, ref textureOffset))
+                    Debug.Log("could not parse textureOffset: " + textureOffsetSerialized);
 
             if (!String.IsNullOrEmpty(specularSerialized))
                 if (!ColorUtils.TryParseColor(specularSerialized, ref specular))

@@ -955,9 +955,18 @@ namespace ProceduralParts
             
             //foreach (AttachNode node in part.attachNodes)
             //    InitializeNode(node);
-            if (part.attachRules.allowSrfAttach)
-                InitializeNode(part.srfAttachNode);
 
+            if (part.attachRules.srfAttach)
+            {
+                if (part.srfAttachNode != null)
+                {
+                    Debug.Log(part.srfAttachNode.id);
+                    InitializeNode(part.srfAttachNode);
+                }
+                else
+                    Debug.Log("srfNode is null");
+            }
+            
             // Update the shape to put the nodes into their positions.
             shape.ForceNextUpdate();
             shape.OnUpdateEditor();
@@ -995,7 +1004,8 @@ namespace ProceduralParts
 
         #region Part Attachments
 
-        private PartAttachment parentAttachment;
+        //private PartAttachment parentAttachment;
+        private FreePartAttachment parentAttachment;
         private readonly LinkedList<PartAttachment> childAttachments = new LinkedList<PartAttachment>();
 
         private class PartAttachment
@@ -1021,6 +1031,7 @@ namespace ProceduralParts
             public Part Child
             {
                 get { return child; }
+                set { child = value; }
             }
 
             public AttachNode AttachNode
@@ -1033,7 +1044,12 @@ namespace ProceduralParts
                 this.child = child;
                 this.node = node;
             }
-            
+
+            public FreePartAttachment()
+            {
+
+            }
+
             // cylindric coordinates
 
             public ProceduralAbstractShape.ShapeCoordinates Coordinates = new ProceduralAbstractShape.ShapeCoordinates();
@@ -1071,6 +1087,7 @@ namespace ProceduralParts
                 }
                 // PushSourceInfo the part down, we need to delta this childAttachment away so that when the translation from the parent reaches here it ends in the right spot
                 part.transform.Translate(-trans, Space.World);
+                Debug.Log("translation: " +trans);
             }
 
             public override void Rotate(Quaternion rotate)
@@ -1250,12 +1267,12 @@ namespace ProceduralParts
             }
 
            
-            shape.GetCylindricCoordinates(transform.InverseTransformPoint(position), newAttachment.Coordinates);
+            //shape.GetCylindricCoordinates(transform.InverseTransformPoint(position), newAttachment.Coordinates);
             
             
 
             TransformFollower.TransformTransformable transformable = new TransformFollower.TransformTransformable(child.transform, node.position);
-            newAttachment.attachment = shape.AddAttachment(TransformFollower.CreateFollower(partModel, position, transformable),newAttachment.Coordinates);
+            newAttachment.attachment = shape.AddAttachment(TransformFollower.CreateFollower(partModel, position, transformable),newAttachment.Coordinates,true);
 
             childAttach.AddLast(newAttachment);
 
@@ -1283,7 +1300,8 @@ namespace ProceduralParts
             for (var node = childAttach.First; node != null; node = node.Next)
                 if (node.Value.Child == child)
                 {
-                    shape.RemoveAttachment(node.Value.attachment);
+                    //shape.RemoveAttachment(node.Value.attachment);
+                    RemovePartAttachment(node.Value);
                     childAttach.Remove(node);
                     //Debug.LogWarning("Detaching from: " + part + " child: " + child.transform.name);
                     return;
@@ -1291,6 +1309,7 @@ namespace ProceduralParts
             Debug.LogWarning("*ST* Message recieved removing child, but can't find child");
         }
 
+        
         [PartMessageListener(typeof(PartParentChanged), scenes: GameSceneFilter.AnyEditor)]
         public void PartParentChanged(Part newParent)
         {
@@ -1317,7 +1336,7 @@ namespace ProceduralParts
                 return;
             }
             Vector3 position = transform.TransformPoint(childToParent.position);
-
+            
             // ReSharper disable once InconsistentNaming
             Func<Vector3> Offset;
             if (nodeOffsets.TryGetValue(childToParent.id, out Offset))
@@ -1325,33 +1344,76 @@ namespace ProceduralParts
 
             Part root = EditorLogic.SortedShipList[0];
 
+            ProceduralAbstractShape.ShapeCoordinates newCoordinates = new ProceduralAbstractShape.ShapeCoordinates();
+
+            switch(part.attachMode)
+            {
+                case AttachModes.SRF_ATTACH:
+                    newCoordinates.RadiusMode = ProceduralAbstractShape.ShapeCoordinates.RMode.OFFSET_FROM_SHAPE_RADIUS;
+                    newCoordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+                    break;
+                case AttachModes.STACK:
+                    if (childToParent.id == "top")
+                        newCoordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.OFFSET_FROM_TOP_NODE;
+                    else if (childToParent.id == "bottom")
+                        newCoordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.OFFSET_FROM_BOTTOM_NODE;
+                    else
+                        newCoordinates.HeightMode = ProceduralAbstractShape.ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
+                    break;         
+            }
+            Debug.Log("ymode: " + newCoordinates.HeightMode);
             //Debug.LogWarning("Attaching: " + part + " to new parent: " + newParent + " node:" + childToParent.id + " position=" + childToParent.position.ToString("G3"));
 
             //we need to delta this childAttachment down so that when the translation from the parent reaches here i ends in the right spot
-            parentAttachment = AddPartAttachment(position, new ParentTransformable(root, part, childToParent));
-            parentAttachment.child = newParent;
+            parentAttachment = AddPartAttachment(position, new ParentTransformable(root, part, childToParent),newCoordinates);
+            parentAttachment.Child = newParent;
 
             // for symetric attachments, seems required. Don't know why.
             //shape.ForceNextUpdate();
         }
 
-        private PartAttachment AddPartAttachment(Vector3 position, TransformFollower.Transformable target, bool normalized = false)
+        private FreePartAttachment AddPartAttachment(Vector3 position, TransformFollower.Transformable target, ProceduralAbstractShape.ShapeCoordinates shapeCoordinates = null)
         {
             if ((object)target == null)
                 Debug.Log("AddPartAttachment: null target!");
             TransformFollower follower = TransformFollower.CreateFollower(partModel, position, target);
-            if((object)follower == null)
+            if ((object)follower == null)
                 Debug.Log("AddPartAttachment: null follower!");
-            object data = shape.AddAttachment(follower, normalized);
 
-            return new PartAttachment(follower, data);
+            if(null == shapeCoordinates) 
+                shapeCoordinates = new ProceduralAbstractShape.ShapeCoordinates();
+
+            FreePartAttachment newAttachment = new FreePartAttachment();
+            newAttachment.Coordinates = shapeCoordinates;
+
+            newAttachment.attachment = shape.AddAttachment(TransformFollower.CreateFollower(partModel, position, target), newAttachment.Coordinates, true);
+ 
+            return newAttachment;
         }
 
-        private void RemovePartAttachment(PartAttachment delete)
+        private void RemovePartAttachment(FreePartAttachment delete)
         {
-            shape.RemoveAttachment(delete.data, false);
-            Destroy(delete.follower.gameObject);
+            shape.RemoveAttachment(delete.attachment);
+            Destroy(delete.attachment.follower.gameObject);
         }
+
+        //private PartAttachment AddPartAttachment(Vector3 position, TransformFollower.Transformable target, bool normalized = false)
+        //{
+        //    if ((object)target == null)
+        //        Debug.Log("AddPartAttachment: null target!");
+        //    TransformFollower follower = TransformFollower.CreateFollower(partModel, position, target);
+        //    if((object)follower == null)
+        //        Debug.Log("AddPartAttachment: null follower!");
+        //    object data = shape.AddAttachment(follower, normalized);
+
+        //    return new PartAttachment(follower, data);
+        //}
+
+        //private void RemovePartAttachment(PartAttachment delete)
+        //{
+        //    shape.RemoveAttachment(delete.data, false);
+        //    Destroy(delete.follower.gameObject);
+        //}
 
         #endregion
 
@@ -1499,11 +1561,11 @@ namespace ProceduralParts
                     TransformFollower follower = shape.RemoveAttachment(nodeAttachments[i], true);
                     nodeAttachments[i] = newShape.AddAttachment(follower, true);
                 }
-                if (parentAttachment != null)
-                {
-                    shape.RemoveAttachment(parentAttachment.data, true);
-                    parentAttachment.data = newShape.AddAttachment(parentAttachment.follower, true);
-                }
+                //if (parentAttachment != null)
+                //{
+                //    shape.RemoveAttachment(parentAttachment.data, true);
+                //    parentAttachment.data = newShape.AddAttachment(parentAttachment.follower, true);
+                //}
                 foreach (PartAttachment childAttachment in childAttachments)
                 {
                     shape.RemoveAttachment(childAttachment.data, true);
@@ -1520,6 +1582,12 @@ namespace ProceduralParts
                     shape.RemoveAttachment(a.attachment, true);
                     a.attachment = newShape.AddAttachment(a.attachment.follower, a.Coordinates);
                 }
+                if(parentAttachment != null)
+                {
+                    shape.RemoveAttachment(parentAttachment.attachment, true);
+                    parentAttachment.attachment = newShape.AddAttachment(parentAttachment.attachment.follower, parentAttachment.Coordinates);
+                }
+
             }
 
             shape = newShape;
@@ -1529,6 +1597,8 @@ namespace ProceduralParts
 
             if (HighLogic.LoadedSceneIsEditor)
                 GameEvents.onEditorShipModified.Fire(EditorLogic.fetch.ship);
+
+            shape.ForceNextUpdate();
         }
 
         #endregion

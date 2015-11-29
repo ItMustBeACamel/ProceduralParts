@@ -18,43 +18,50 @@ namespace ProceduralParts
             Debug.LogWarning("OnLoad Shape");
             endCaps = new EndCapList();
 
-            ConfigNode endCapsNode = node.GetNode("END_CAPS");
+            if (null == endCapsSerialized)
+            { 
 
-            if(endCapsNode != null)
-            {
-                endCaps.Load(endCapsNode);
-            }
-            else
-            {
-                Debug.LogWarning("No End caps found");
-            }
+                ConfigNode endCapsNode = node.GetNode("END_CAPS");
 
-            // Serialize the end caps
-            endCapsSerialized = ObjectSerializer.Serialize(endCaps);
+                if (endCapsNode != null)
+                {
+                    endCaps.Load(endCapsNode);
+                }
+                else
+                {
+                    Debug.LogWarning("No End caps found");
+                }
+
+                // Serialize the end caps
+                endCapsSerialized = ObjectSerializer.Serialize(endCaps);
+            }
         }
 
         public override void OnSave(ConfigNode node)
         {
             base.OnSave(node);
 
-            if (endCaps != null)
-            {
-                ConfigNode capsNode = ConfigNode.CreateConfigFromObject(endCaps);
-                endCaps.Save(capsNode);
+            //if (endCaps != null)
+            //{
+            //    ConfigNode capsNode = ConfigNode.CreateConfigFromObject(endCaps);
+            //    endCaps.Save(capsNode);
 
-                node.AddNode("END_CAPS", capsNode);
-            }
+            //    node.AddNode("END_CAPS", capsNode);
+            //}
 
         }
 
         public override void OnStart(StartState state)
         {
-            Debug.LogWarning("OnStart Shape " + displayName);
+            //Debug.LogWarning("OnStart Shape " + displayName);
 
             base.OnStart(state);
 
             foreach(AttachNode attachNode in part.attachNodes)
             {
+                if (attachNode.nodeType == AttachNode.NodeType.Surface)
+                    continue;
+
                 AttachmentNode newNode;
 
                 newNode.Node = attachNode;
@@ -78,7 +85,7 @@ namespace ProceduralParts
                     newNode.Position.u = 0;
                     newNode.Position.y = -1;
                     newNode.Position.HeightMode = ShapeCoordinates.YMode.RELATIVE_TO_SHAPE;
-                    newNode.Position.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_TOP_RADIUS;
+                    newNode.Position.RadiusMode = ShapeCoordinates.RMode.RELATIVE_TO_BOTTOM_RADIUS;
                 }
                 else
                 {
@@ -101,6 +108,9 @@ namespace ProceduralParts
                 UI_ChooseOption range = (UI_ChooseOption)field.uiControlEditor;
 
                 range.options = endCaps.EndCaps.Select(x => x.name).ToArray();
+
+                if (!endCapsSelectable || endCaps.EndCaps.Count < 2)   
+                    field.guiActiveEditor = false;
             }
             else
                 Debug.LogWarning("endCapSerialized == null");
@@ -630,7 +640,10 @@ namespace ProceduralParts
 
             foreach(ShapeAttachment a in shapeAttachments)
             {
-                a.follower.transform.localPosition = FromCylindricCoordinates(a.coordinates);
+                Debug.LogWarning("old attachment position: " + a.follower.transform.localPosition.ToString("F7"));
+                Vector3 newPos = FromCylindricCoordinates(a.coordinates);
+                a.follower.transform.localPosition = newPos;
+                Debug.LogWarning("Moving attachment:" + a + " to:" + newPos.ToString("F7"));
                 a.follower.ForceUpdate();
             }
 
@@ -1501,9 +1514,9 @@ namespace ProceduralParts
                     //positions[i] = vertices[i].xz() * pp.r;
                     //positions[i].y = top ? vertices[i].y + pp.offset : vertices[i].y - pp.offset;
 
-                    uv1[i] = vertices[i].xz2().normalized / 2.0f * pp.uv1 + new Vector2(0.5f, 0.5f);
-                    uv2[i] = vertices[i].xz2().normalized / 2.0f * pp.uv2 + new Vector2(0.5f, 0.5f);
-                    
+                    uv1[i] = vertices[i].xz2().normalized / 2.0f * pp.uv1;// + new Vector2(0.5f, 0.5f);
+                    uv2[i] = vertices[i].xz2().normalized / 2.0f * pp.uv2;// + new Vector2(0.5f, 0.5f);
+                    Debug.Log("uv " + i + ":" + uv1[i]);
                 }
 
                 RingMeshBuilder.EdgeMode edgeMode;
@@ -1943,6 +1956,9 @@ namespace ProceduralParts
 
         #region End Caps
 
+        [KSPField]
+        public bool endCapsSelectable = true;
+
         public EndCapList endCaps = new EndCapList();
 
         [SerializeField]
@@ -2030,13 +2046,18 @@ namespace ProceduralParts
             material.SetFloat("_Shininess", endCap.shininess);
             material.SetTextureScale("_MainTex", endCap.textureScale);
             material.SetTextureScale("_BumpMap", endCap.textureScale);
-            
-            //Debug.Log("scale: " + selectedEndCaps.topCap.textureScale);
+            //material.SetTextureOffset("_MainTex", endCap.textureOffset);
+            //material.SetTextureOffset("_BumpMap", endCap.textureOffset);
 
-            Vector2 topOffset = new Vector2((1f / endCap.textureScale.x - 1f) / 2f,
-                                                (1f / endCap.textureScale.y - 1f) / 2f);
+            Debug.Log("scale: " + endCap.textureScale.ToString("F5"));
+            Debug.Log("offset: " + endCap.textureOffset.ToString("F5"));
 
+            //Vector2 topOffset = new Vector2((1f * endCap.textureScale.x - 1f) / 2f,
+            //                                    (1f * endCap.textureScale.y - 1f) / 2f) + endCap.textureOffset;
 
+            Vector2 topOffset = new Vector2(0.5f, 0.5f) + endCap.textureOffset;
+            material.mainTexture.wrapMode = TextureWrapMode.Clamp;
+            Debug.Log("topOffset: " + topOffset);
             material.SetTextureOffset("_MainTex", topOffset);
 
             material.SetTextureOffset("_BumpMap", topOffset);

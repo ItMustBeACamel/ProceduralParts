@@ -250,6 +250,16 @@ namespace ProceduralParts
 
         public class ShapeCoordinates
         {
+            public ShapeCoordinates(RMode rMode = RMode.RELATIVE_TO_SHAPE_RADIUS, YMode yMode = YMode.RELATIVE_TO_SHAPE,
+                                        float u = 0, float y = 0, float r = 0)
+            {
+                RadiusMode = rMode;
+                HeightMode = yMode;
+                this.r = r;
+                this.u = u;
+                this.y = y;
+            }
+
             public enum RMode
             {
                 OFFSET_FROM_SHAPE_CENTER,
