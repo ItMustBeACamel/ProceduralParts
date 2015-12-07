@@ -1970,6 +1970,13 @@ namespace ProceduralParts
 
         private EndCaps selectedEndCaps;
 
+        public EndCaps SelectedEndCaps
+        {
+            get
+            {
+                return selectedEndCaps;
+            }
+        }
 
         public void UpdateEndCaps(bool force = false)
         {
@@ -2056,7 +2063,7 @@ namespace ProceduralParts
             //                                    (1f * endCap.textureScale.y - 1f) / 2f) + endCap.textureOffset;
 
             Vector2 topOffset = new Vector2(0.5f, 0.5f) + endCap.textureOffset;
-            material.mainTexture.wrapMode = TextureWrapMode.Clamp;
+            //material.mainTexture.wrapMode = TextureWrapMode.Clamp;
             Debug.Log("topOffset: " + topOffset);
             material.SetTextureOffset("_MainTex", topOffset);
 

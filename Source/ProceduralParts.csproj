@@ -57,6 +57,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CapEditor.cs" />
+    <Compile Include="CapTextureTweaker.cs" />
     <Compile Include="DecouplerTweaker.cs" />
     <Compile Include="EndCapProfile.cs" />
     <Compile Include="ICostModifier.cs" />
