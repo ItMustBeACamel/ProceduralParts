@@ -23,6 +23,29 @@ namespace ProceduralParts
         [UI_ChooseOption(controlEnabled =true, scene = UI_Scene.Editor)]
         public string currentProfileName;
 
+        public EndCapProfile CurrentProfile
+        {
+            get
+            {
+                return currentProfile;
+            }
+        }
+
+        [KSPEvent(guiActiveEditor = true)]
+        public void Export()
+        {
+            if(null != currentEndCaps)
+            {
+                ConfigNode newNode;// = new ConfigNode();
+
+                newNode = ConfigNode.CreateConfigFromObject(currentEndCaps);
+
+                currentEndCaps.Save(newNode);
+
+                newNode.Save("export.cfg");
+            }
+        }
+
         public override void OnStart(StartState state)
         {
             base.OnStart(state);
@@ -30,9 +53,6 @@ namespace ProceduralParts
             pPart = GetComponent<ProceduralPart>();
 
             chooseOption = (UI_ChooseOption)Fields["currentProfileName"].uiControlEditor;
-
-            
-
         }
 
         void Update()
@@ -66,8 +86,6 @@ namespace ProceduralParts
                         {
                             string[] options = { "BOTH" };
                             chooseOption.options = options;
-                            chooseOption.controlEnabled = true;
-
                         }
                         else
                         {
@@ -81,10 +99,38 @@ namespace ProceduralParts
                                 string[] options = { "BOTTOM" };
                                 chooseOption.options = options;
                             }
-                            chooseOption.controlEnabled = true;
+                            else
+                            {
+                                string[] options = { "BOTTOM", "TOP" };
+                                chooseOption.options = options;
+                            }
+                        }
+                        chooseOption.controlEnabled = true;
+
+                        if(chooseOption.options.Length > 0 && !chooseOption.options.Contains(currentProfileName))
+                        {
+                            currentProfileName = chooseOption.options[0];
                         }
                     }
+                } // if end caps changed
+
+                if (sorShape.SelectedEndCaps != null)
+                {
+
+                    switch (currentProfileName)
+                    {
+                        case "TOP":
+                        case "BOTH":
+                            currentProfile = currentEndCaps.topCap;
+                            break;
+
+                        case "BOTTOM":
+                            currentProfile = currentEndCaps.bottomCap;
+                            break;
+                    }
                 }
+                else
+                    currentProfile = null;
             }       
         }
 

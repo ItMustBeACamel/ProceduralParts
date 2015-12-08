@@ -5,11 +5,14 @@ namespace ProceduralParts
 {
     class CapTextureTweaker : PartModule
     {
+        CapEditor capEditor;
         ProceduralAbstractShape currentShape = null;
 
-        EndCaps currentEndCaps = null;
+        //EndCaps currentEndCaps = null;
 
         ProceduralPart pPart;
+
+        EndCapProfile currentProfile = null;
 
         [KSPField(category = "textureTweaker", guiActive = false, guiActiveEditor = true, guiFormat = "F4", guiName = "tex offset X"),
             UI_FloatEdit(scene = UI_Scene.Editor, incrementLarge =0.1f, incrementSmall =0.01f, incrementSlide = 0.001f)]
@@ -32,14 +35,17 @@ namespace ProceduralParts
             base.OnStart(state);
 
             pPart = GetComponent<ProceduralPart>();
+            capEditor = GetComponent<CapEditor>();
 
         }
 
         void Update()
         {
-            ProceduralAbstractSoRShape sorShape = null;
+            //ProceduralAbstractSoRShape sorShape = null;
             Vector2 texOffset = new Vector2(texOffsetX, texOffsetY);
             Vector2 texScale = new Vector2(texScaleX, texScaleY);
+
+            /////////////////////////////////////////////////////////////
 
             if (pPart.CurrentShape != currentShape)
             {
@@ -47,51 +53,114 @@ namespace ProceduralParts
                 currentShape = pPart.CurrentShape;
             }
 
-            if (currentShape != null)
-                sorShape = currentShape as ProceduralAbstractSoRShape;
-
-            if (sorShape != null)
+            if(null != capEditor)
             {
-                if (sorShape.SelectedEndCaps != currentEndCaps)
+                if(currentProfile != capEditor.CurrentProfile)
                 {
-                    Debug.Log("caps changed");
-                    currentEndCaps = sorShape.SelectedEndCaps;
+                    // currently selected Profile has changed
+                    currentProfile = capEditor.CurrentProfile;
 
-                    if (currentEndCaps != null)
+                    if (null != currentProfile)
                     {
-                        texOffset = currentEndCaps.topCap.textureOffset;
-                        texScale = currentEndCaps.topCap.textureScale;
+                        texOffset = currentProfile.textureOffset;
+                        texScale = currentProfile.textureScale;
                         texOffsetX = texOffset.x;
                         texOffsetY = texOffset.y;
 
                         texScaleX = texScale.x;
                         texScaleY = texScale.y;
+
+                        Fields["texOffsetX"].guiActiveEditor = true;
+                        Fields["texOffsetY"].guiActiveEditor = true;
+                        Fields["texScaleX"].guiActiveEditor  = true;
+                        Fields["texScaleY"].guiActiveEditor  = true;
+                    }
+                    else
+                    {
+                        Fields["texOffsetX"].guiActiveEditor = false;
+                        Fields["texOffsetY"].guiActiveEditor = false;
+                        Fields["texScaleX"].guiActiveEditor  = false;
+                        Fields["texScaleY"].guiActiveEditor  = false;
                     }
                 }
-                else
+                else if(null != currentProfile)
                 {
                     bool updateCap = false;
 
-                    if (texOffset != currentEndCaps.topCap.textureOffset)
+                    if (texOffset != currentProfile.textureOffset)
                     {
-                        currentEndCaps.topCap.textureOffset = texOffset;
+                        currentProfile.textureOffset = texOffset;
                         updateCap = true;
                     }
 
-                    if (texScale != currentEndCaps.topCap.textureScale)
+                    if (texScale != currentProfile.textureScale)
                     {
-                        currentEndCaps.topCap.textureScale = texScale;
+                        currentProfile.textureScale = texScale;
                         updateCap = true;
                     }
 
-                    if(updateCap)
+                    if (updateCap)
                     {
                         Debug.Log("Updating end cap");
                         currentShape.UpdateEndCapsTexture();
                     }
                 }
-
             }
+
+
+            /////////////////////////////////////////////////////////////
+
+            //if (pPart.CurrentShape != currentShape)
+            //{
+            //    Debug.Log("shape changed");
+            //    currentShape = pPart.CurrentShape;
+            //}
+
+            //if (currentShape != null)
+            //    sorShape = currentShape as ProceduralAbstractSoRShape;
+
+            //if (sorShape != null)
+            //{
+            //    if (sorShape.SelectedEndCaps != currentEndCaps)
+            //    {
+            //        Debug.Log("caps changed");
+            //        currentEndCaps = sorShape.SelectedEndCaps;
+
+            //        if (currentEndCaps != null)
+            //        {
+            //            texOffset = currentEndCaps.topCap.textureOffset;
+            //            texScale = currentEndCaps.topCap.textureScale;
+            //            texOffsetX = texOffset.x;
+            //            texOffsetY = texOffset.y;
+
+            //            texScaleX = texScale.x;
+            //            texScaleY = texScale.y;
+            //        }
+            //    }
+            //    else
+            //    {
+            //        bool updateCap = false;
+
+            //        if (texOffset != currentEndCaps.topCap.textureOffset)
+            //        {
+            //            currentEndCaps.topCap.textureOffset = texOffset;
+            //            updateCap = true;
+            //        }
+
+            //        if (texScale != currentEndCaps.topCap.textureScale)
+            //        {
+            //            currentEndCaps.topCap.textureScale = texScale;
+            //            updateCap = true;
+            //        }
+
+            //        if(updateCap)
+            //        {
+            //            Debug.Log("Updating end cap");
+            //            currentShape.UpdateEndCapsTexture();
+            //        }
+            //    }
+
+            //}
 
         }
     }
